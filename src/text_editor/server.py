@@ -80,7 +80,7 @@ class TextEditorServer:
                 line_end (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
 
             Returns:
-                dict: Dictionary containing the text with each line prefixed with its line number (e.g., "1 | line text"), and lines range hash if file has <= self.max_edit_lines lines
+                dict: Dictionary containing the text with each line prefixed with its line number (e.g., "1|text"), and lines range hash if file has <= self.max_edit_lines lines
             """
             result = {}
 
@@ -113,9 +113,8 @@ class TextEditorServer:
 
                 selected_lines = lines[line_start - 1 : line_end]
                 numbered_lines = []
-                max_line_num_width = len(str(line_end))
                 for i, line in enumerate(selected_lines, start=line_start):
-                    numbered_lines.append(f"{i:{max_line_num_width}} | {line}")
+                    numbered_lines.append(f"{i}|{line}")
 
                 text = "".join(numbered_lines)
                 result["text"] = text
