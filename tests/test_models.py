@@ -15,7 +15,7 @@ from mcp_text_editor.models import (
 )
 
 
-def test_get_text_file_request():
+def test_get_text_request():
     """Test GetTextFileContentsRequest model."""
     # Test with only required field
     request = GetTextFileContentsRequest(file_path="/path/to/file.txt")
@@ -34,7 +34,7 @@ def test_get_text_file_request():
         GetTextFileContentsRequest()
 
 
-def test_get_text_file_response():
+def test_get_text_response():
     """Test GetTextFileContentsResponse model."""
     response = GetTextFileContentsResponse(
         contents="file content", start=1, end=10, hash="hash123"

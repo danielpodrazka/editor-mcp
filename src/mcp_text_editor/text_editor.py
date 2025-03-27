@@ -282,10 +282,10 @@ class TextEditor:
                     )
                 elif current_file_hash != expected_file_hash:
                     suggestion = "patch"
-                    hint = "Please use get_text_file tool to get the current content and hash"
+                    hint = "Please use get_text tool to get the current content and hash"
 
                     return self.create_error_response(
-                        "FileHash mismatch - Please use get_text_file tool to get current content and hashes, then retry with the updated hashes.",
+                        "FileHash mismatch - Please use get_text tool to get current content and hashes, then retry with the updated hashes.",
                         suggestion=suggestion,
                         hint=hint,
                     )
@@ -397,9 +397,9 @@ class TextEditor:
                         if actual_range_hash != expected_range_hash:
                             return {
                                 "result": "error",
-                                "reason": "Content range hash mismatch - Please use get_text_file tool with the same start and end to get current content and hashes, then retry with the updated hashes.",
+                                "reason": "Content range hash mismatch - Please use get_text tool with the same start and end to get current content and hashes, then retry with the updated hashes.",
                                 "suggestion": "get",
-                                "hint": "Please run get_text_file first to get current content and hashes",
+                                "hint": "Please run get_text first to get current content and hashes",
                             }
 
                 # Prepare new content
@@ -532,7 +532,7 @@ class TextEditor:
             if current_hash != file_hash:
                 return {
                     "result": "error",
-                    "reason": "File hash mismatch - Please use get_text_file tool to get current content and hash",
+                    "reason": "File hash mismatch - Please use get_text tool to get current content and hash",
                     "hash": None,
                 }
 
@@ -631,7 +631,7 @@ class TextEditor:
                 return {
                     request.file_path: {
                         "result": "error",
-                        "reason": "File hash mismatch - Please use get_text_file tool to get current content and hash",
+                        "reason": "File hash mismatch - Please use get_text tool to get current content and hash",
                         "hash": current_hash,
                     }
                 }

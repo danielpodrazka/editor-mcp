@@ -44,7 +44,7 @@ async def test_hash_mismatch_hint(editor, tmp_path):
     assert result["result"] == "error"
     assert "hash mismatch" in result["reason"].lower()
     assert result["suggestion"] == "patch"
-    assert "get_text_file tool" in result["hint"]
+    assert "get_text tool" in result["hint"]
 
 
 @pytest.mark.asyncio

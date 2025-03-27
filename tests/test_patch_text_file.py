@@ -322,7 +322,7 @@ async def test_patch_text_file_insert_hint(tmp_path):
 
 @pytest.mark.asyncio
 async def test_patch_text_file_hash_mismatch_hint(tmp_path):
-    """Test patching with wrong hash suggests using get_text_file."""
+    """Test patching with wrong hash suggests using get_text."""
     file_path = os.path.join(tmp_path, "test.txt")
     editor = TextEditor()
 
@@ -343,6 +343,6 @@ async def test_patch_text_file_hash_mismatch_hint(tmp_path):
         [patch],
     )
 
-    # Verify the suggestion to use get_text_file
+    # Verify the suggestion to use get_text
     assert result["result"] == "error"
-    assert "get_text_file" in result["hint"]
+    assert "get_text" in result["hint"]

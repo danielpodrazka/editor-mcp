@@ -37,7 +37,7 @@ class AppendTextFileContentsHandler(BaseHandler):
                     },
                     "file_hash": {
                         "type": "string",
-                        "description": "Hash of the file contents for concurrency control. it should be matched with the file_hash when get_text_file is called.",
+                        "description": "Hash of the file contents for concurrency control. it should be matched with the file_hash when get_text is called.",
                     },
                     "encoding": {
                         "type": "string",
