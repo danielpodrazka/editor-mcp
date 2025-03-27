@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
 
-def calculate_hash(text: str, line_start=None, line_end=None) -> str:
+def calculate_hash(text: str, line_start: int = None, line_end: int = None) -> str:
     """
     Args:
         text (str): Content to hash
@@ -60,7 +60,7 @@ class TextEditorServer:
                 line_end (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
 
             Returns:
-                dict: Dictionary containing the text and its hash
+                dict: Dictionary containing the text, and its hash if file has <= 50 lines
             """
             # Check if a file is set
             if self.current_file_path is None:
@@ -91,13 +91,27 @@ class TextEditorServer:
                     # Extract the specified lines (adjusting for 0-based indexing in Python)
                     selected_lines = lines[line_start - 1 : line_end]
                     text = "".join(selected_lines)
-                    lines_hash = calculate_hash(text, line_start, line_end)
+
+                    # Only include lines_hash if the selection has 50 or fewer lines
+                    result = {"text": text}
+                    if len(selected_lines) <= 50:
+                        result["lines_hash"] = calculate_hash(
+                            text, line_start, line_end
+                        )
+
+                    return result
                 else:
                     # Return the entire file
                     text = "".join(lines)
-                    lines_hash = calculate_hash(text)
+                    result = {"text": text}
 
-                return {"text": text, "lines_hash": lines_hash}
+                    # Only include lines_hash if the file has 50 or fewer lines
+                    if len(lines) <= 50:
+                        result["lines_hash"] = calculate_hash(text)
+                    else:
+                        result["info"] = "range > 50 so no hash."
+
+                    return result
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
 

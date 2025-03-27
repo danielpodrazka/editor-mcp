@@ -206,3 +206,48 @@ class TestTextEditorServer:
         hash_with_range = calculate_hash(text, 1, 3)
         assert hash_with_range.startswith("L1-3-")
         assert hash_with_range.endswith(expected)
+
+    @pytest.mark.asyncio
+    async def test_get_text_large_file(self, server):
+        """Test getting text from a file larger than 50 lines."""
+        # Create a temporary file with more than 50 lines
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
+            for i in range(60):
+                f.write(f"Line {i + 1}\n")
+            large_file_path = f.name
+
+        try:
+            # Set the file
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(large_file_path)
+
+            # Get the entire file
+            get_text_fn = self.get_tool_fn(server, "get_text")
+            result = await get_text_fn()
+
+            # Verify 'lines_hash' is not included when file is > 50 lines
+            assert "text" in result
+            assert "lines_hash" not in result
+            assert "range > 50 so no hash." in result["info"]
+            assert len(result["text"].splitlines()) == 60
+
+            # Now get a small subset of lines (e.g., lines 5-15)
+            result = await get_text_fn(5, 15)
+
+            # Verify 'lines_hash' is included when selection is <= 50 lines
+            assert "text" in result
+            assert "lines_hash" in result
+            assert len(result["text"].splitlines()) == 11  # Lines 5-15 inclusive
+
+            # Get a large subset of lines (e.g., lines 5-60)
+            result = await get_text_fn(5, 60)
+
+            # Verify 'lines_hash' is not included when selection is > 50 lines
+            assert "text" in result
+            assert "lines_hash" not in result
+            assert len(result["text"].splitlines()) == 56  # Lines 5-60 inclusive
+
+        finally:
+            # Clean up
+            if os.path.exists(large_file_path):
+                os.unlink(large_file_path)
