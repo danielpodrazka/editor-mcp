@@ -90,41 +90,7 @@ class TextEditorServer:
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
-                if line_start is not None or line_end is not None:
-                    if line_start is None:
-                        line_start = 1
-                    if line_end is None:
-                        line_end = len(lines)
-
-                    if line_start < 1:
-                        return {"error": "line_start must be at least 1"}
-
-                    if line_end > len(lines):
-                        line_end = len(lines)
-
-                    if line_start > line_end:
-                        return {"error": "line_start cannot be greater than line_end"}
-
-                    selected_lines = lines[line_start - 1 : line_end]
-
-                    numbered_lines = []
-                    max_line_num_width = len(str(line_end))
-                    for i, line in enumerate(selected_lines, start=line_start):
-                        numbered_lines.append(f"{i:{max_line_num_width}} | {line}")
-                    text = "".join(numbered_lines)
-
-                    result["text"] = text
-                    if len(selected_lines) <= self.max_edit_lines:
-                        original_text = "".join(selected_lines)
-                        result["lines_hash"] = calculate_hash(
-                            original_text, line_start, line_end
-                        )
-                    else:
-                        result["info"] = (
-                            f"{len(selected_lines)=} > {self.max_edit_lines=} so no hash."
-                        )
-                    return result
-                else:
+                if line_start is None and line_end is None:
                     numbered_lines = []
                     max_line_num_width = len(str(len(lines)))
                     for i, line in enumerate(lines, start=1):
@@ -133,6 +99,37 @@ class TextEditorServer:
                     result["text"] = text
                     result["info"] = "No line_start/line_end provided so no hash"
                     return result
+
+                if line_start is None:
+                    line_start = 1
+                if line_end is None:
+                    line_end = len(lines)
+                if line_start < 1:
+                    return {"error": "line_start must be at least 1"}
+                if line_end > len(lines):
+                    line_end = len(lines)
+                if line_start > line_end:
+                    return {"error": "line_start cannot be greater than line_end"}
+
+                selected_lines = lines[line_start - 1 : line_end]
+                numbered_lines = []
+                max_line_num_width = len(str(line_end))
+                for i, line in enumerate(selected_lines, start=line_start):
+                    numbered_lines.append(f"{i:{max_line_num_width}} | {line}")
+
+                text = "".join(numbered_lines)
+                result["text"] = text
+                if len(selected_lines) <= self.max_edit_lines:
+                    original_text = "".join(selected_lines)
+                    result["lines_hash"] = calculate_hash(
+                        original_text, line_start, line_end
+                    )
+                else:
+                    result["info"] = (
+                        f"{len(selected_lines)=} > {self.max_edit_lines=} so no hash."
+                    )
+                return result
+
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
 
