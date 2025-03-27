@@ -12,7 +12,7 @@ from .base import BaseHandler
 class GetTextFileContentsHandler(BaseHandler):
     """Handler for getting text file contents."""
 
-    name = "get_text_file_contents"
+    name = "get_text_file"
     description = (
         "Read text file contents from multiple files and line ranges. "
         "Returns file contents with hashes for concurrency control and line numbers for reference. "

@@ -1,4 +1,4 @@
-"""Test cases for append_text_file_contents handler."""
+"""Test cases for append_text_file handler."""
 
 import os
 from typing import Any, Dict, Generator

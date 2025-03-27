@@ -223,7 +223,7 @@ class TextEditor:
             patches (List[Dict[str, Any]]): List of patches to apply, each containing:
                 - start (int): Starting line number (1-based)
                 - end (Optional[int]): Ending line number (inclusive)
-                - contents (str): New content to insert (if empty string, consider using delete_text_file_contents instead)
+                - contents (str): New content to insert (if empty string, consider using delete_text_file instead)
                 - range_hash (str): Expected hash of the content being replaced
 
         Returns:
@@ -242,7 +242,7 @@ class TextEditor:
                     return self.create_error_response(
                         "File not found and non-empty hash provided",
                         suggestion="append",
-                        hint="For new files, please consider using append_text_file_contents",
+                        hint="For new files, please consider using append_text_file",
                     )
                 # Create parent directories if they don't exist
                 parent_dir = os.path.dirname(file_path)
@@ -282,10 +282,10 @@ class TextEditor:
                     )
                 elif current_file_hash != expected_file_hash:
                     suggestion = "patch"
-                    hint = "Please use get_text_file_contents tool to get the current content and hash"
+                    hint = "Please use get_text_file tool to get the current content and hash"
 
                     return self.create_error_response(
-                        "FileHash mismatch - Please use get_text_file_contents tool to get current content and hashes, then retry with the updated hashes.",
+                        "FileHash mismatch - Please use get_text_file tool to get current content and hashes, then retry with the updated hashes.",
                         suggestion=suggestion,
                         hint=hint,
                     )
@@ -397,9 +397,9 @@ class TextEditor:
                         if actual_range_hash != expected_range_hash:
                             return {
                                 "result": "error",
-                                "reason": "Content range hash mismatch - Please use get_text_file_contents tool with the same start and end to get current content and hashes, then retry with the updated hashes.",
+                                "reason": "Content range hash mismatch - Please use get_text_file tool with the same start and end to get current content and hashes, then retry with the updated hashes.",
                                 "suggestion": "get",
-                                "hint": "Please run get_text_file_contents first to get current content and hashes",
+                                "hint": "Please run get_text_file first to get current content and hashes",
                             }
 
                 # Prepare new content
@@ -413,7 +413,7 @@ class TextEditor:
                     return {
                         "result": "ok",
                         "file_hash": current_file_hash,  # Return current hash since no changes made
-                        "hint": "For content deletion, please consider using delete_text_file_contents instead of patch with empty content",
+                        "hint": "For content deletion, please consider using delete_text_file instead of patch with empty content",
                         "suggestion": "delete",
                     }
 
@@ -422,14 +422,14 @@ class TextEditor:
                 hint_text: Optional[str] = None
                 if not os.path.exists(file_path) or not current_file_content:
                     suggestion_text = "append"
-                    hint_text = "For new or empty files, please consider using append_text_file_contents instead"
+                    hint_text = "For new or empty files, please consider using append_text_file instead"
                 elif is_insertion:
                     if start_zero >= len(lines):
                         suggestion_text = "append"
-                        hint_text = "For adding content at the end of file, please consider using append_text_file_contents instead"
+                        hint_text = "For adding content at the end of file, please consider using append_text_file instead"
                     else:
                         suggestion_text = "insert"
-                        hint_text = "For inserting content within file, please consider using insert_text_file_contents instead"
+                        hint_text = "For inserting content within file, please consider using insert_text_file instead"
 
                 # Prepare the content
                 new_content = contents if contents.endswith("\n") else contents + "\n"
@@ -463,7 +463,7 @@ class TextEditor:
             return self.create_error_response(
                 f"File not found: {file_path}",
                 suggestion="append",
-                hint="For new files, please use append_text_file_contents",
+                hint="For new files, please use append_text_file",
             )
         except (IOError, UnicodeError, PermissionError) as e:
             return self.create_error_response(
@@ -482,7 +482,7 @@ class TextEditor:
                 hint="Please try again or report the issue if it persists",
             )
 
-    async def insert_text_file_contents(
+    async def insert_text_file(
         self,
         file_path: str,
         file_hash: str,
@@ -532,7 +532,7 @@ class TextEditor:
             if current_hash != file_hash:
                 return {
                     "result": "error",
-                    "reason": "File hash mismatch - Please use get_text_file_contents tool to get current content and hash",
+                    "reason": "File hash mismatch - Please use get_text_file tool to get current content and hash",
                     "hash": None,
                 }
 
@@ -592,7 +592,7 @@ class TextEditor:
                 "hash": None,
             }
 
-    async def delete_text_file_contents(
+    async def delete_text_file(
         self,
         request: DeleteTextFileContentsRequest,
     ) -> Dict[str, Any]:
@@ -631,7 +631,7 @@ class TextEditor:
                 return {
                     request.file_path: {
                         "result": "error",
-                        "reason": "File hash mismatch - Please use get_text_file_contents tool to get current content and hash",
+                        "reason": "File hash mismatch - Please use get_text_file tool to get current content and hash",
                         "hash": current_hash,
                     }
                 }

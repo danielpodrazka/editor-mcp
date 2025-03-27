@@ -30,7 +30,7 @@ async def test_list_tools():
 
     # Verify GetTextFileContents tool
     get_contents_tool = next(
-        (tool for tool in tools if tool.name == "get_text_file_contents"), None
+        (tool for tool in tools if tool.name == "get_text_file"), None
     )
     assert get_contents_tool is not None
     assert "file" in get_contents_tool.description.lower()
@@ -89,7 +89,7 @@ async def test_get_contents_handler_invalid_file(test_file):
 async def test_call_tool_get_contents(test_file):
     """Test call_tool with GetTextFileContents."""
     args = {"files": [{"file_path": test_file, "ranges": [{"start": 1, "end": 3}]}]}
-    result = await call_tool("get_text_file_contents", args)
+    result = await call_tool("get_text_file", args)
     assert len(result) == 1
     assert isinstance(result[0], TextContent)
     content = json.loads(result[0].text)
@@ -116,14 +116,14 @@ async def test_call_tool_error_handling():
     """Test call_tool error handling."""
     # Test with invalid arguments
     with pytest.raises(RuntimeError) as exc_info:
-        await call_tool("get_text_file_contents", {"invalid": "args"})
+        await call_tool("get_text_file", {"invalid": "args"})
     assert "Missing required argument" in str(exc_info.value)
 
     # Convert relative path to absolute
     nonexistent_path = str(Path("nonexistent.txt").absolute())
     with pytest.raises(RuntimeError) as exc_info:
         await call_tool(
-            "get_text_file_contents",
+            "get_text_file",
             {"files": [{"file_path": nonexistent_path, "ranges": [{"start": 1}]}]},
         )
     assert "File not found" in str(exc_info.value)
@@ -212,7 +212,7 @@ async def test_call_tool_general_exception():
     try:
         get_contents_handler.run_tool = mock_run_tool
         with pytest.raises(RuntimeError) as exc_info:
-            await call_tool("get_text_file_contents", {"files": []})
+            await call_tool("get_text_file", {"files": []})
         assert "Error executing command: Unexpected error" in str(exc_info.value)
     finally:
         # Restore original method

@@ -5,11 +5,11 @@
 ### Added
 
 - New text file manipulation operations:
-  - `insert_text_file_contents`: Insert content at specific positions
+  - `insert_text_file`: Insert content at specific positions
   - `create_text_file`: Create new text files
-  - `append_text_file_contents`: Append content to existing files
-  - `delete_text_file_contents`: Delete specified ranges of text
-  - `patch_text_file_contents`: Apply multiple patches to text files
+  - `append_text_file`: Append content to existing files
+  - `delete_text_file`: Delete specified ranges of text
+  - `patch_text_file`: Apply multiple patches to text files
 - Enhanced error messages with useful suggestions for alternative editing methods
 
 ### Changed
@@ -18,7 +18,7 @@
 - Improved handler organization by moving them to separate directory
 - Made 'end' parameter required when not in append mode
 - Enhanced validation for required parameters and file path checks
-- Removed 'edit_text_file_contents' tool in favor of more specific operations
+- Removed 'edit_text_file' tool in favor of more specific operations
 - Improved JSON serialization for handler responses
 
 ### Fixed

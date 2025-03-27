@@ -26,7 +26,7 @@ async def test_file_not_found_hint(editor, tmp_path):
     assert result["result"] == "error"
     assert "File not found" in result["reason"]
     assert result["suggestion"] == "append"
-    assert "append_text_file_contents" in result["hint"]
+    assert "append_text_file" in result["hint"]
 
 
 @pytest.mark.asyncio
@@ -44,7 +44,7 @@ async def test_hash_mismatch_hint(editor, tmp_path):
     assert result["result"] == "error"
     assert "hash mismatch" in result["reason"].lower()
     assert result["suggestion"] == "patch"
-    assert "get_text_file_contents tool" in result["hint"]
+    assert "get_text_file tool" in result["hint"]
 
 
 @pytest.mark.asyncio
@@ -124,7 +124,7 @@ async def test_empty_content_delete_hint(editor, tmp_path):
 
     assert result["result"] == "ok"  # Note: It's "ok" but suggests using delete
     assert result["suggestion"] == "delete"
-    assert "delete_text_file_contents" in result["hint"]
+    assert "delete_text_file" in result["hint"]
 
 
 @pytest.mark.asyncio
@@ -140,4 +140,4 @@ async def test_append_suggestion_for_new_file(editor, tmp_path):
 
     assert result["result"] == "ok"
     assert result["suggestion"] == "append"
-    assert "append_text_file_contents" in result["hint"]
+    assert "append_text_file" in result["hint"]

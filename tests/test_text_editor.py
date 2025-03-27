@@ -99,7 +99,7 @@ async def test_calculate_hash(editor):
 
 
 @pytest.mark.asyncio
-async def test_read_file_contents(editor, test_file):
+async def test_read_file(editor, test_file):
     """Test reading file contents."""
     # Test reading entire file
     (
@@ -574,13 +574,13 @@ async def test_new_file_with_non_empty_hash(editor, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_read_file_contents_with_start_beyond_total(editor, tmp_path):
-    """Test read_file_contents when start is beyond total lines."""
+async def test_read_file_with_start_beyond_total(editor, tmp_path):
+    """Test read_file when start is beyond total lines."""
     # Create a test file
     test_file = tmp_path / "test.txt"
     test_file.write_text("line1\nline2\nline3\n")
 
-    # Call read_file_contents with start beyond total lines
+    # Call read_file with start beyond total lines
     (
         content,
         start,

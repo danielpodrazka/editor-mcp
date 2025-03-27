@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from mcp_text_editor.handlers.patch_text_file_contents import (
+from mcp_text_editor.handlers.patch_text_file import (
     PatchTextFileContentsHandler,
 )
 from mcp_text_editor.text_editor import TextEditor
@@ -55,7 +55,7 @@ async def test_patch_text_file_middle(tmp_path):
 
 @pytest.mark.asyncio
 async def test_patch_text_file_empty_content(tmp_path):
-    """Test patching with empty content suggests using delete_text_file_contents."""
+    """Test patching with empty content suggests using delete_text_file."""
     # Create a test file
     file_path = os.path.join(tmp_path, "test.txt")
     editor = TextEditor()
@@ -88,10 +88,10 @@ async def test_patch_text_file_empty_content(tmp_path):
         [patch],
     )
 
-    # Verify that the operation suggests using delete_text_file_contents
+    # Verify that the operation suggests using delete_text_file
     assert result["result"] == "ok"
     assert result["file_hash"] == file_hash
-    assert "delete_text_file_contents" in result["hint"]
+    assert "delete_text_file" in result["hint"]
     assert result["suggestion"] == "delete"
 
     # Verify file content remains unchanged
@@ -228,7 +228,7 @@ async def test_patch_text_file_overlapping(tmp_path):
 
 @pytest.mark.asyncio
 async def test_patch_text_file_new_file_hint(tmp_path):
-    """Test patching a new file suggests using append_text_file_contents."""
+    """Test patching a new file suggests using append_text_file."""
     file_path = os.path.join(tmp_path, "new.txt")
     editor = TextEditor()
 
@@ -244,15 +244,15 @@ async def test_patch_text_file_new_file_hint(tmp_path):
         [patch],
     )
 
-    # Verify that the operation suggests using append_text_file_contents
+    # Verify that the operation suggests using append_text_file
     assert result["result"] == "ok"
     assert result["suggestion"] == "append"
-    assert "append_text_file_contents" in result["hint"]
+    assert "append_text_file" in result["hint"]
 
 
 @pytest.mark.asyncio
 async def test_patch_text_file_append_hint(tmp_path):
-    """Test patching beyond file end suggests using append_text_file_contents."""
+    """Test patching beyond file end suggests using append_text_file."""
     file_path = os.path.join(tmp_path, "test.txt")
     editor = TextEditor()
 
@@ -279,15 +279,15 @@ async def test_patch_text_file_append_hint(tmp_path):
         [patch],
     )
 
-    # Verify the suggestion to use append_text_file_contents
+    # Verify the suggestion to use append_text_file
     assert result["result"] == "ok"
     assert result["suggestion"] == "append"
-    assert "append_text_file_contents" in result["hint"]
+    assert "append_text_file" in result["hint"]
 
 
 @pytest.mark.asyncio
 async def test_patch_text_file_insert_hint(tmp_path):
-    """Test patching with insertion suggests using insert_text_file_contents."""
+    """Test patching with insertion suggests using insert_text_file."""
     file_path = os.path.join(tmp_path, "test.txt")
     editor = TextEditor()
 
@@ -314,15 +314,15 @@ async def test_patch_text_file_insert_hint(tmp_path):
         [patch],
     )
 
-    # Verify the suggestion to use insert_text_file_contents
+    # Verify the suggestion to use insert_text_file
     assert result["result"] == "ok"
     assert result["suggestion"] == "insert"
-    assert "insert_text_file_contents" in result["hint"]
+    assert "insert_text_file" in result["hint"]
 
 
 @pytest.mark.asyncio
 async def test_patch_text_file_hash_mismatch_hint(tmp_path):
-    """Test patching with wrong hash suggests using get_text_file_contents."""
+    """Test patching with wrong hash suggests using get_text_file."""
     file_path = os.path.join(tmp_path, "test.txt")
     editor = TextEditor()
 
@@ -343,6 +343,6 @@ async def test_patch_text_file_hash_mismatch_hint(tmp_path):
         [patch],
     )
 
-    # Verify the suggestion to use get_text_file_contents
+    # Verify the suggestion to use get_text_file
     assert result["result"] == "error"
-    assert "get_text_file_contents" in result["hint"]
+    assert "get_text_file" in result["hint"]

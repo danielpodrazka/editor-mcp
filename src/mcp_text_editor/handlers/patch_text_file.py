@@ -16,8 +16,8 @@ logger = logging.getLogger("mcp-text-editor")
 class PatchTextFileContentsHandler(BaseHandler):
     """Handler for patching a text file."""
 
-    name = "patch_text_file_contents"
-    description = "Apply patches to text files with hash-based validation for concurrency control.you need to use get_text_file_contents tool to get the file hash and range hash every time before using this tool. you can use append_text_file_contents tool to append text contents to the file without range hash, start and end. you can use insert_text_file_contents tool to insert text contents to the file without range hash, start and end."
+    name = "patch_text_file"
+    description = "Apply patches to text files with hash-based validation for concurrency control.you need to use get_text_file tool to get the file hash and range hash every time before using this tool. you can use append_text_file tool to append text contents to the file without range hash, start and end. you can use insert_text_file tool to insert text contents to the file without range hash, start and end."
 
     def get_tool_description(self) -> Tool:
         """Get the tool description."""
@@ -55,7 +55,7 @@ class PatchTextFileContentsHandler(BaseHandler):
                                 },
                                 "range_hash": {
                                     "type": "string",
-                                    "description": "Hash of the content being replaced. it should get from get_text_file_contents tool with the same start and end.",
+                                    "description": "Hash of the content being replaced. it should get from get_text_file tool with the same start and end.",
                                 },
                             },
                             "required": ["start", "end", "contents", "range_hash"],

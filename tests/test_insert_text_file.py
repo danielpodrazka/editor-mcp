@@ -24,7 +24,7 @@ async def test_insert_after_line(tmp_path: Path) -> None:
     file_hash = result[str(test_file)]["file_hash"]
 
     # Insert text after line 2
-    result = await editor.insert_text_file_contents(
+    result = await editor.insert_text_file(
         file_path=str(test_file), file_hash=file_hash, after=2, contents="new_line\n"
     )
 
@@ -53,7 +53,7 @@ async def test_insert_before_line(tmp_path: Path) -> None:
     file_hash = result[str(test_file)]["file_hash"]
 
     # Insert text before line 2
-    result = await editor.insert_text_file_contents(
+    result = await editor.insert_text_file(
         file_path=str(test_file), file_hash=file_hash, before=2, contents="new_line\n"
     )
 
@@ -82,7 +82,7 @@ async def test_insert_beyond_file_end(tmp_path: Path) -> None:
     file_hash = result[str(test_file)]["file_hash"]
 
     # Try to insert text after line 10 (file has only 3 lines)
-    result = await editor.insert_text_file_contents(
+    result = await editor.insert_text_file(
         file_path=str(test_file), file_hash=file_hash, after=10, contents="new_line\n"
     )
 
@@ -97,7 +97,7 @@ async def test_file_not_found(tmp_path: Path) -> None:
     editor = TextEditor()
 
     # Try to insert text into a non-existent file
-    result = await editor.insert_text_file_contents(
+    result = await editor.insert_text_file(
         file_path=str(tmp_path / "nonexistent.txt"),
         file_hash="any_hash",
         after=1,
@@ -119,7 +119,7 @@ async def test_hash_mismatch(tmp_path: Path) -> None:
     editor = TextEditor()
 
     # Try to insert text with incorrect hash
-    result = await editor.insert_text_file_contents(
+    result = await editor.insert_text_file(
         file_path=str(test_file),
         file_hash="incorrect_hash",
         after=1,

@@ -15,7 +15,7 @@ from mcp_text_editor.models import (
 )
 
 
-def test_get_text_file_contents_request():
+def test_get_text_file_request():
     """Test GetTextFileContentsRequest model."""
     # Test with only required field
     request = GetTextFileContentsRequest(file_path="/path/to/file.txt")
@@ -34,7 +34,7 @@ def test_get_text_file_contents_request():
         GetTextFileContentsRequest()
 
 
-def test_get_text_file_contents_response():
+def test_get_text_file_response():
     """Test GetTextFileContentsResponse model."""
     response = GetTextFileContentsResponse(
         contents="file content", start=1, end=10, hash="hash123"
@@ -132,7 +132,7 @@ def test_edit_result():
         EditResult()
 
 
-def test_edit_text_file_contents_request():
+def test_edit_text_file_request():
     """Test EditTextFileContentsRequest model."""
     # Test with single file operation
     request = EditTextFileContentsRequest(

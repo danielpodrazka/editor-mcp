@@ -139,7 +139,7 @@ python -m mcp_text_editor
 
 The server provides several tools for text file manipulation:
 
-#### get_text_file_contents
+#### get_text_file
 
 Get the contents of one or more text files with line range specification.
 
@@ -231,7 +231,7 @@ Parameters:
 }
 ```
 
-#### patch_text_file_contents
+#### patch_text_file
 
 Apply patches to text files with robust error handling and conflict detection. Supports editing multiple files in a single operation.
 
@@ -264,12 +264,12 @@ Apply patches to text files with robust error handling and conflict detection. S
 ```
 
 Important Notes:
-1. Always get the current hash and range_hash using get_text_file_contents before editing
+1. Always get the current hash and range_hash using get_text_file before editing
 2. Patches are applied from bottom to top to handle line number shifts correctly
 3. Patches must not overlap within the same file
 4. Line numbers are 1-based
 5. `end: null` can be used to append content to the end of file
-6. File encoding must match the encoding used in get_text_file_contents
+6. File encoding must match the encoding used in get_text_file
 
 **Success Response:**
 
@@ -289,8 +289,8 @@ Important Notes:
   "file1.txt": {
     "result": "error",
     "reason": "Content hash mismatch",
-    "suggestion": "get",  // Suggests using get_text_file_contents
-    "hint": "Please run get_text_file_contents first to get current content and hashes"
+    "suggestion": "get",  // Suggests using get_text_file
+    "hint": "Please run get_text_file first to get current content and hashes"
   }
 }
 ```
@@ -310,7 +310,7 @@ Important Notes:
 1. Get current content and hash:
 
 ```python
-contents = await get_text_file_contents({
+contents = await get_text_file({
     "files": [
         {
             "file_path": "file.txt",
@@ -323,7 +323,7 @@ contents = await get_text_file_contents({
 2. Edit file content:
 
 ```python
-result = await edit_text_file_contents({
+result = await edit_text_file({
     "files": [
         {
             "path": "file.txt",
@@ -381,7 +381,7 @@ The server handles various error cases:
 2. Hash Mismatch and Range Hash Errors
    - The file was modified by another process
    - Content being replaced has changed
-   - Run get_text_file_contents to get fresh hashes
+   - Run get_text_file to get fresh hashes
 
 3. Encoding Issues
    - Verify file encoding matches the specified encoding

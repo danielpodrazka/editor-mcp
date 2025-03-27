@@ -47,7 +47,7 @@ async def test_delete_single_line(editor, test_file):
     )
 
     # Delete line 2
-    result = await editor.delete_text_file_contents(request)
+    result = await editor.delete_text_file(request)
 
     assert result[str(test_file)]["result"] == "ok"
     assert test_file.read_text() == "Line 1\nLine 3\nLine 4\nLine 5\n"
@@ -77,7 +77,7 @@ async def test_delete_multiple_lines(editor, test_file):
     )
 
     # Delete lines 2-4
-    result = await editor.delete_text_file_contents(request)
+    result = await editor.delete_text_file(request)
 
     assert result[str(test_file)]["result"] == "ok"
     assert test_file.read_text() == "Line 1\nLine 5\n"
@@ -102,7 +102,7 @@ async def test_delete_with_invalid_file_hash(editor, test_file):
         ],
     )
 
-    result = await editor.delete_text_file_contents(request)
+    result = await editor.delete_text_file(request)
 
     assert result[str(test_file)]["result"] == "error"
     assert "hash mismatch" in result[str(test_file)]["reason"].lower()
@@ -126,7 +126,7 @@ async def test_delete_with_invalid_range_hash(editor, test_file):
         ],
     )
 
-    result = await editor.delete_text_file_contents(request)
+    result = await editor.delete_text_file(request)
 
     assert result[str(test_file)]["result"] == "error"
     assert "hash mismatch" in result[str(test_file)]["reason"].lower()
@@ -151,7 +151,7 @@ async def test_delete_with_invalid_range(editor, test_file):
         ],
     )
 
-    result = await editor.delete_text_file_contents(request)
+    result = await editor.delete_text_file(request)
 
     assert result[str(test_file)]["result"] == "error"
     assert (
@@ -178,7 +178,7 @@ async def test_delete_with_out_of_range(editor, test_file):
         ],
     )
 
-    result = await editor.delete_text_file_contents(request)
+    result = await editor.delete_text_file(request)
 
     assert result[str(test_file)]["result"] == "error"
     assert (
@@ -215,7 +215,7 @@ async def test_delete_with_overlapping_ranges(editor, test_file):
         ],
     )
 
-    result = await editor.delete_text_file_contents(request)
+    result = await editor.delete_text_file(request)
 
     assert result[str(test_file)]["result"] == "error"
     assert "overlapping ranges" in result[str(test_file)]["reason"].lower()
@@ -249,7 +249,7 @@ async def test_delete_multiple_ranges(editor, test_file):
         ],
     )
 
-    result = await editor.delete_text_file_contents(request)
+    result = await editor.delete_text_file(request)
 
     assert result[str(test_file)]["result"] == "ok"
     assert test_file.read_text() == "Line 1\nLine 3\nLine 5\n"

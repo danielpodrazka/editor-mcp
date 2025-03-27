@@ -16,7 +16,7 @@ logger = logging.getLogger("mcp-text-editor")
 class AppendTextFileContentsHandler(BaseHandler):
     """Handler for appending content to an existing text file."""
 
-    name = "append_text_file_contents"
+    name = "append_text_file"
     description = "Append content to an existing text file. The file must exist."
 
     def get_tool_description(self) -> Tool:
@@ -37,7 +37,7 @@ class AppendTextFileContentsHandler(BaseHandler):
                     },
                     "file_hash": {
                         "type": "string",
-                        "description": "Hash of the file contents for concurrency control. it should be matched with the file_hash when get_text_file_contents is called.",
+                        "description": "Hash of the file contents for concurrency control. it should be matched with the file_hash when get_text_file is called.",
                     },
                     "encoding": {
                         "type": "string",

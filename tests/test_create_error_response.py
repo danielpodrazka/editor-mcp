@@ -24,12 +24,12 @@ def test_create_error_response_basic(editor):
 def test_create_error_response_with_hint_suggestion(editor):
     """Test error response with hint and suggestion."""
     response = editor.create_error_response(
-        "Test error", suggestion="append", hint="Please use append_text_file_contents"
+        "Test error", suggestion="append", hint="Please use append_text_file"
     )
     assert response["result"] == "error"
     assert response["reason"] == "Test error"
     assert response["suggestion"] == "append"
-    assert response["hint"] == "Please use append_text_file_contents"
+    assert response["hint"] == "Please use append_text_file"
 
 
 def test_create_error_response_with_file_path(editor):

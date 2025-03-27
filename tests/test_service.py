@@ -15,25 +15,25 @@ def service():
     return TextEditorService()
 
 
-def test_read_file_contents(service, test_file):
+def test_read_file(service, test_file):
     """Test reading file contents."""
     # Test reading entire file
-    content, start, end = service.read_file_contents(test_file)
+    content, start, end = service.read_file(test_file)
     assert content == "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
     assert start == 1
     assert end == 5
 
     # Test reading specific lines
-    content, start, end = service.read_file_contents(test_file, start=2, end=4)
+    content, start, end = service.read_file(test_file, start=2, end=4)
     assert content == "Line 2\nLine 3\nLine 4\n"
     assert start == 2
     assert end == 4
 
 
-def test_read_file_contents_invalid_file(service):
+def test_read_file_invalid_file(service):
     """Test reading non-existent file."""
     with pytest.raises(FileNotFoundError):
-        service.read_file_contents("nonexistent.txt")
+        service.read_file("nonexistent.txt")
 
 
 def test_validate_patches(service):

@@ -16,7 +16,7 @@ class TextEditorService:
     """Service class for text file operations."""
 
     @staticmethod
-    def read_file_contents(
+    def read_file(
         file_path: str, start: int = 1, end: Optional[int] = None
     ) -> Tuple[str, int, int]:
         """Read file contents within specified line range."""
@@ -121,7 +121,7 @@ class TextEditorService:
                 )
             }
 
-    def delete_text_file_contents(
+    def delete_text_file(
         self,
         request: DeleteTextFileContentsRequest,
     ) -> Dict[str, EditResult]:
