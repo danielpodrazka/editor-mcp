@@ -65,7 +65,7 @@ class CreateTextFileHandler(BaseHandler):
 
             encoding = arguments.get("encoding", "utf-8")
 
-            # Create new file using edit_file_contents with empty expected_hash
+            # Create new file using edit_file with empty expected_hash
             result = await self.editor.edit_file(
                 file_path,
                 expected_file_hash="",  # Empty hash for new file

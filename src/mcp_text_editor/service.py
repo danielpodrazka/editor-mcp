@@ -49,7 +49,7 @@ class TextEditorService:
 
         return True
 
-    def edit_file_contents(
+    def edit_file(
         self, file_path: str, operation: EditFileOperation
     ) -> Dict[str, EditResult]:
         """Edit file contents with conflict detection."""

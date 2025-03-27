@@ -145,12 +145,12 @@ async def test_patch_text_file_unexpected_error(tmp_path, mocker):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write("test content\n")
 
-    # Mock edit_file_contents to raise an unexpected error
-    async def mock_edit_file_contents(*args, **kwargs):
+    # Mock edit_file to raise an unexpected error
+    async def mock_edit_file(*args, **kwargs):
         raise Exception("Unexpected test error")
 
     # Patch the editor's method using mocker
-    mocker.patch.object(editor, "edit_file", mock_edit_file_contents)
+    mocker.patch.object(editor, "edit_file", mock_edit_file)
 
     # Try to patch the file with the mocked error
     with pytest.raises(

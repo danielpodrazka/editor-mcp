@@ -91,7 +91,7 @@ class PatchTextFileContentsHandler(BaseHandler):
 
             encoding = arguments.get("encoding", "utf-8")
 
-            # Apply patches using editor.edit_file_contents
+            # Apply patches using editor.edit_file
             result = await self.editor.edit_file(
                 file_path=file_path,
                 expected_file_hash=arguments["file_hash"],

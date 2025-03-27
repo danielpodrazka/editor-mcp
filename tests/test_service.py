@@ -57,7 +57,7 @@ def test_validate_patches(service):
     assert service.validate_patches(patches, 5) is False
 
 
-def test_edit_file_contents(service, tmp_path):
+def test_edit_file(service, tmp_path):
     """Test editing file contents."""
     # Create test file
     test_file = tmp_path / "edit_test.txt"
@@ -76,7 +76,7 @@ def test_edit_file_contents(service, tmp_path):
     )
 
     # Apply edit
-    result = service.edit_file_contents(file_path, operation)
+    result = service.edit_file(file_path, operation)
     assert file_path in result
     edit_result = result[file_path]
     assert isinstance(edit_result, EditResult)
@@ -87,7 +87,7 @@ def test_edit_file_contents(service, tmp_path):
     assert "new line2" in new_content
 
 
-def test_edit_file_contents_hash_mismatch(service, tmp_path):
+def test_edit_file_hash_mismatch(service, tmp_path):
     """Test editing with hash mismatch."""
     # Create test file
     test_file = tmp_path / "hash_mismatch_test.txt"
@@ -103,14 +103,14 @@ def test_edit_file_contents_hash_mismatch(service, tmp_path):
     )
 
     # Attempt edit
-    result = service.edit_file_contents(file_path, operation)
+    result = service.edit_file(file_path, operation)
     assert file_path in result
     edit_result = result[file_path]
     assert edit_result.result == "error"
     assert "hash mismatch" in edit_result.reason.lower()
 
 
-def test_edit_file_contents_invalid_patches(service, tmp_path):
+def test_edit_file_invalid_patches(service, tmp_path):
     """Test editing with invalid patches."""
     # Create test file
     test_file = tmp_path / "invalid_patches_test.txt"
@@ -133,14 +133,14 @@ def test_edit_file_contents_invalid_patches(service, tmp_path):
     )
 
     # Attempt edit
-    result = service.edit_file_contents(file_path, operation)
+    result = service.edit_file(file_path, operation)
     assert file_path in result
     edit_result = result[file_path]
     assert edit_result.result == "error"
     assert "invalid patch" in edit_result.reason.lower()
 
 
-def test_edit_file_contents_file_error(service):
+def test_edit_file_file_error(service):
     """Test editing with file error."""
     file_path = "nonexistent.txt"
     # Attempt to edit non-existent file
@@ -151,7 +151,7 @@ def test_edit_file_contents_file_error(service):
     )
 
     # Attempt edit
-    result = service.edit_file_contents(file_path, operation)
+    result = service.edit_file(file_path, operation)
     assert file_path in result
     edit_result = result[file_path]
     assert edit_result.result == "error"
@@ -169,7 +169,7 @@ def test_edit_file_unexpected_error(service, tmp_path):
     )
 
     # Try to edit non-existent file
-    result = service.edit_file_contents(test_file, operation)
+    result = service.edit_file(test_file, operation)
     edit_result = result[test_file]
 
     # Verify error handling
@@ -178,7 +178,7 @@ def test_edit_file_unexpected_error(service, tmp_path):
     assert edit_result.hash is None
 
 
-def test_edit_file_contents_permission_error(service, tmp_path):
+def test_edit_file_permission_error(service, tmp_path):
     """Test handling of permission errors during file editing."""
     # Create test file
     test_file = tmp_path / "general_error_test.txt"
@@ -197,7 +197,7 @@ def test_edit_file_contents_permission_error(service, tmp_path):
     )
 
     # Attempt edit
-    result = service.edit_file_contents(file_path, operation)
+    result = service.edit_file(file_path, operation)
     edit_result = result[file_path]
 
     assert edit_result.result == "error"
@@ -208,7 +208,7 @@ def test_edit_file_contents_permission_error(service, tmp_path):
     os.chmod(file_path, 0o644)
 
 
-def test_edit_file_contents_general_exception(service, mocker):
+def test_edit_file_general_exception(service, mocker):
     """Test handling of general exceptions during file editing."""
     test_file = "test.txt"
     operation = EditFileOperation(
@@ -231,7 +231,7 @@ def test_edit_file_contents_general_exception(service, mocker):
             side_effect=Exception("Unexpected error during file operation"),
         )
 
-        result = service.edit_file_contents(test_file, operation)
+        result = service.edit_file(test_file, operation)
         edit_result = result[test_file]
 
         assert edit_result.result == "error"

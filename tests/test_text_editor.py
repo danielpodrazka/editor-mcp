@@ -144,7 +144,7 @@ async def test_encoding_error(editor, test_invalid_encoding_file):
     assert "Failed to decode file" in str(excinfo.value)
     assert "utf-8" in str(excinfo.value)
 
-    # Try to read Shift-JIS file with incorrect encoding in edit_file_contents
+    # Try to read Shift-JIS file with incorrect encoding in edit_file
     result = await editor.edit_file(
         test_invalid_encoding_file,
         "dummy_hash",
