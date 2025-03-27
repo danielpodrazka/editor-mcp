@@ -397,3 +397,68 @@ class TestTextEditorServer:
 
         assert result["status"] == "success"
         assert "lines_hash" not in result
+
+    @pytest.mark.asyncio
+    async def test_delete_current_file(self, server):
+        """Test delete_current_file tool."""
+
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
+            f.write("Test content to delete")
+            temp_path = f.name
+
+        try:
+            delete_file_fn = self.get_tool_fn(server, "delete_current_file")
+            result = await delete_file_fn()
+            assert "error" in result
+            assert "No file path is set" in result["error"]
+
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(temp_path)
+
+            result = await delete_file_fn()
+            assert result["status"] == "success"
+            assert "successfully deleted" in result["message"]
+            assert temp_path in result["message"]
+
+            assert not os.path.exists(temp_path)
+
+            assert server.current_file_path is None
+
+            result = await set_file_fn(temp_path)
+            assert "Error: File not found" in result
+
+            assert server.current_file_path is None
+
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_delete_current_file_permission_error(self, server, monkeypatch):
+        """Test delete_current_file with permission error."""
+
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
+            f.write("Test content")
+            temp_path = f.name
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(temp_path)
+
+            def mock_remove(path):
+                raise PermissionError("Permission denied")
+
+            monkeypatch.setattr(os, "remove", mock_remove)
+
+            delete_file_fn = self.get_tool_fn(server, "delete_current_file")
+            result = await delete_file_fn()
+
+            assert "error" in result
+            assert "Permission denied" in result["error"]
+
+            assert server.current_file_path == temp_path
+
+        finally:
+            monkeypatch.undo()
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)

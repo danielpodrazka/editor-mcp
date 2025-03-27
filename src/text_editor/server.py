@@ -271,6 +271,35 @@ class TextEditorServer:
 
             return {"error": "Unknown error occurred."}
 
+        @self.mcp.tool()
+        async def delete_current_file() -> Dict[str, Any]:
+            """
+            Delete the currently set file.
+
+            Returns:
+                dict: Operation result with status and message
+            """
+
+            if self.current_file_path is None:
+                return {"error": "No file path is set. Use set_file first."}
+
+            try:
+                if not os.path.exists(self.current_file_path):
+                    return {"error": f"File '{self.current_file_path}' does not exist."}
+
+                os.remove(self.current_file_path)
+
+                deleted_path = self.current_file_path
+
+                self.current_file_path = None
+
+                return {
+                    "status": "success",
+                    "message": f"File '{deleted_path}' was successfully deleted.",
+                }
+            except Exception as e:
+                return {"error": f"Error deleting file: {str(e)}"}
+
     def run(self):
         """Run the MCP server."""
         self.mcp.run(transport="stdio")
