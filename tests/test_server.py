@@ -10,7 +10,7 @@ from mcp.types import TextContent, Tool
 from pytest_mock import MockerFixture
 
 from mcp_text_editor.server import (
-    GetTextFileContentsHandler,
+    GetTextHandler,
     app,
     call_tool,
     create_file_handler,
@@ -167,7 +167,7 @@ async def test_main_run_error(mocker: MockerFixture):
 @pytest.mark.asyncio
 async def test_get_contents_relative_path():
     """Test GetTextFileContents with relative path."""
-    handler = GetTextFileContentsHandler()
+    handler = GetTextHandler()
     with pytest.raises(RuntimeError, match="File path must be absolute:.*"):
         await handler.run_tool(
             {
@@ -181,7 +181,7 @@ async def test_get_contents_relative_path():
 @pytest.mark.asyncio
 async def test_get_contents_absolute_path():
     """Test GetTextFileContents with absolute path."""
-    handler = GetTextFileContentsHandler()
+    handler = GetTextHandler()
     abs_path = str(Path("/absolute/path/file.txt").absolute())
 
     # Define mock as async function

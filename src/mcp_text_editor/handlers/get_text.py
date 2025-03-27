@@ -9,7 +9,7 @@ from mcp.types import TextContent, Tool
 from .base import BaseHandler
 
 
-class GetTextFileContentsHandler(BaseHandler):
+class GetTextHandler(BaseHandler):
     """Handler for getting text file contents."""
 
     name = "get_text"

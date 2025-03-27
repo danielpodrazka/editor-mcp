@@ -10,7 +10,7 @@ from mcp.types import TextContent, Tool
 
 from .handlers import (
     CreateTextFileHandler,
-    GetTextFileContentsHandler,
+    GetTextHandler,
     EditTextHandler,
 )
 from .version import __version__
@@ -22,7 +22,7 @@ logger = logging.getLogger("mcp-text-editor")
 app = Server("mcp-text-editor")
 
 # Initialize tool handlers
-get_contents_handler = GetTextFileContentsHandler()
+get_contents_handler = GetTextHandler()
 patch_file_handler = EditTextHandler()
 create_file_handler = CreateTextFileHandler()
 
