@@ -131,6 +131,13 @@ class TextEditorServer:
 
             Returns:
                 dict: Operation result with status and new hash if applicable
+
+            Notes:
+                - In overwrite mode, the number of new lines can differ from the original range.
+                  For example, you can replace 2 lines with 10 lines, or replace 10 lines with nothing (empty string).
+                - When replacing content with an empty string, the lines within the specified range will be removed.
+                - The behavior mimics copy-paste: original lines are removed, new lines are inserted at that position,
+                  and any content after the original section is preserved and will follow the new content.
             """
 
             if self.current_file_path is None:
