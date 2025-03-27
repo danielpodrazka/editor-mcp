@@ -71,7 +71,7 @@ class TestTextEditorServer:
         """Test getting text when no file is set."""
         get_text_fn = self.get_tool_fn(server, "get_text")
 
-        result = await get_text_fn()
+        result = await get_text_fn(include_line_numbers=False)
 
         assert "error" in result
         assert "No file path is set" in result["error"]
@@ -84,7 +84,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn()
+        result = await get_text_fn(include_line_numbers=False)
 
         assert "text" in result
         assert "lines_hash" in result
@@ -101,7 +101,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 4)
+        result = await get_text_fn(2, 4, include_line_numbers=False)
 
         assert "text" in result
         assert "lines_hash" in result
@@ -117,7 +117,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3)
+        result = await get_text_fn(3, include_line_numbers=False)
 
         assert "Line 3\nLine 4\nLine 5\n" == result["text"]
         expected_hash = calculate_hash("Line 3\nLine 4\nLine 5\n", 3, 5)
@@ -130,7 +130,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(None, 2)
+        result = await get_text_fn(None, 2, include_line_numbers=False)
 
         assert "Line 1\nLine 2\n" == result["text"]
         expected_hash = calculate_hash("Line 1\nLine 2\n", 1, 2)
@@ -144,11 +144,11 @@ class TestTextEditorServer:
 
         get_text_fn = self.get_tool_fn(server, "get_text")
 
-        result = await get_text_fn(4, 2)
+        result = await get_text_fn(4, 2, include_line_numbers=False)
         assert "error" in result
         assert "line_start cannot be greater than line_end" in result["error"]
 
-        result = await get_text_fn(0, 3)
+        result = await get_text_fn(0, 3, include_line_numbers=False)
         assert "error" in result
         assert "line_start must be at least 1" in result["error"]
 
@@ -159,7 +159,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3, 10)
+        result = await get_text_fn(3, 10, include_line_numbers=False)
 
         assert "Line 3\nLine 4\nLine 5\n" == result["text"]
         expected_hash = calculate_hash("Line 3\nLine 4\nLine 5\n", 3, 5)
@@ -172,7 +172,7 @@ class TestTextEditorServer:
         await set_file_fn(empty_temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn()
+        result = await get_text_fn(include_line_numbers=False)
 
         assert result["text"] == ""
         expected_hash = calculate_hash("")
@@ -204,20 +204,20 @@ class TestTextEditorServer:
             await set_file_fn(large_file_path)
 
             get_text_fn = self.get_tool_fn(server, "get_text")
-            result = await get_text_fn()
+            result = await get_text_fn(include_line_numbers=False)
 
             assert "text" in result
             assert "lines_hash" not in result
             assert f"range > self.max_edit_lines=50 so no hash." in result["info"]
             assert len(result["text"].splitlines()) == 60
 
-            result = await get_text_fn(5, 15)
+            result = await get_text_fn(5, 15, include_line_numbers=False)
 
             assert "text" in result
             assert "lines_hash" in result
             assert len(result["text"].splitlines()) == 11
 
-            result = await get_text_fn(5, 60)
+            result = await get_text_fn(5, 60, include_line_numbers=False)
 
             assert "text" in result
             assert "lines_hash" not in result
@@ -256,7 +256,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 2)
+        result = await get_text_fn(2, 2, include_line_numbers=False)
         line_content = result["text"]
         line_hash = result["lines_hash"]
 
@@ -267,7 +267,7 @@ class TestTextEditorServer:
         assert result["status"] == "success"
         assert "new_line_hash" in result
 
-        result = await get_text_fn()
+        result = await get_text_fn(include_line_numbers=False)
         assert new_text in result["text"]
 
         lines = result["text"].splitlines()
@@ -289,7 +289,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 4)
+        result = await get_text_fn(2, 4, include_line_numbers=False)
         line_content = result["text"]
         lines_hash = result["lines_hash"]
 
@@ -302,7 +302,7 @@ class TestTextEditorServer:
         assert result["status"] == "success"
         assert "lines_hash" in result
 
-        result = await get_text_fn()
+        result = await get_text_fn(include_line_numbers=False)
         lines = result["text"].splitlines()
 
         assert "Line 1" in lines[0]
@@ -375,7 +375,7 @@ class TestTextEditorServer:
         assert "lines_hash" not in result
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3, 3)
+        result = await get_text_fn(3, 3, include_line_numbers=False)
         line_hash = result["lines_hash"]
 
         result = await edit_text_fn(
@@ -384,7 +384,7 @@ class TestTextEditorServer:
         assert result["status"] == "success"
         assert "new_line_hash" in result
 
-        result = await get_text_fn(10, 20)
+        result = await get_text_fn(10, 20, include_line_numbers=False)
         line_hash = result["lines_hash"]
 
         large_replacement = "\n".join([f"New line {i}" for i in range(1, 60)])

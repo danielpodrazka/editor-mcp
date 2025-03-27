@@ -71,7 +71,7 @@ class TextEditorServer:
         async def get_text(
             line_start: Optional[int] = None,
             line_end: Optional[int] = None,
-            include_line_numbers: Optional[bool] = False,
+            include_line_numbers: Optional[bool] = True,
         ) -> Dict[str, Any]:
             """
             Read text from the current file.
