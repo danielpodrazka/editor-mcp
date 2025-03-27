@@ -9,7 +9,6 @@ from mcp.server import Server
 from mcp.types import TextContent, Tool
 
 from .handlers import (
-    AppendTextFileContentsHandler,
     CreateTextFileHandler,
     GetTextFileContentsHandler,
     PatchTextFileContentsHandler,
@@ -26,7 +25,6 @@ app = Server("mcp-text-editor")
 get_contents_handler = GetTextFileContentsHandler()
 patch_file_handler = PatchTextFileContentsHandler()
 create_file_handler = CreateTextFileHandler()
-append_file_handler = AppendTextFileContentsHandler()
 
 
 @app.list_tools()
@@ -35,7 +33,6 @@ async def list_tools() -> List[Tool]:
     return [
         get_contents_handler.get_tool_description(),
         create_file_handler.get_tool_description(),
-        append_file_handler.get_tool_description(),
         patch_file_handler.get_tool_description(),
     ]
 
@@ -49,8 +46,6 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
             return await get_contents_handler.run_tool(arguments)
         elif name == create_file_handler.name:
             return await create_file_handler.run_tool(arguments)
-        elif name == append_file_handler.name:
-            return await append_file_handler.run_tool(arguments)
         elif name == patch_file_handler.name:
             return await patch_file_handler.run_tool(arguments)
         else:

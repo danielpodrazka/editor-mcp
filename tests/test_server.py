@@ -12,7 +12,6 @@ from pytest_mock import MockerFixture
 from mcp_text_editor.server import (
     GetTextFileContentsHandler,
     app,
-    append_file_handler,
     call_tool,
     create_file_handler,
     get_contents_handler,
@@ -26,12 +25,10 @@ from mcp_text_editor.server import (
 async def test_list_tools():
     """Test tool listing."""
     tools: List[Tool] = await list_tools()
-    assert len(tools) == 4
+    assert len(tools) == 3
 
     # Verify GetTextFileContents tool
-    get_contents_tool = next(
-        (tool for tool in tools if tool.name == "get_text"), None
-    )
+    get_contents_tool = next((tool for tool in tools if tool.name == "get_text"), None)
     assert get_contents_tool is not None
     assert "file" in get_contents_tool.description.lower()
     assert "contents" in get_contents_tool.description.lower()
@@ -225,7 +222,6 @@ async def test_call_tool_all_handlers(mocker: MockerFixture):
     # Mock run_tool for each handler
     handlers = [
         create_file_handler,
-        append_file_handler,
         patch_file_handler,
     ]
 
