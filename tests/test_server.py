@@ -11,6 +11,7 @@ class TestTextEditorServer:
     def server(self):
         """Create a TextEditorServer instance for testing."""
         server = TextEditorServer()
+        server.max_edit_lines = 50
         return server
 
     @pytest.fixture
@@ -191,7 +192,7 @@ class TestTextEditorServer:
 
     @pytest.mark.asyncio
     async def test_get_text_large_file(self, server):
-        """Test getting text from a file larger than 50 lines."""
+        """Test getting text from a file larger than MAX_EDIT_LINES lines."""
 
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             for i in range(60):
@@ -207,7 +208,7 @@ class TestTextEditorServer:
 
             assert "text" in result
             assert "lines_hash" not in result
-            assert "range > 50 so no hash." in result["info"]
+            assert f"range > self.max_edit_lines=50 so no hash." in result["info"]
             assert len(result["text"].splitlines()) == 60
 
             result = await get_text_fn(5, 15)

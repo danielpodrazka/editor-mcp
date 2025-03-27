@@ -25,6 +25,7 @@ def calculate_hash(text: str, line_start: int = None, line_end: int = None) -> s
 class TextEditorServer:
     def __init__(self):
         self.mcp = FastMCP("text-editor")
+        self.max_edit_lines = os.getenv("MAX_EDIT_LINES", 50)
         self.current_file_path = None
 
         self.register_tools()
@@ -60,7 +61,7 @@ class TextEditorServer:
                 line_end (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
 
             Returns:
-                dict: Dictionary containing the text, and its hash if file has <= 50 lines
+                dict: Dictionary containing the text, and its hash if file has <= self.max_edit_lines lines
             """
 
             if self.current_file_path is None:
@@ -89,7 +90,7 @@ class TextEditorServer:
                     text = "".join(selected_lines)
 
                     result = {"text": text}
-                    if len(selected_lines) <= 50:
+                    if len(selected_lines) <= self.max_edit_lines:
                         result["lines_hash"] = calculate_hash(
                             text, line_start, line_end
                         )
@@ -99,10 +100,10 @@ class TextEditorServer:
                     text = "".join(lines)
                     result = {"text": text}
 
-                    if len(lines) <= 50:
+                    if len(lines) <= self.max_edit_lines:
                         result["lines_hash"] = calculate_hash(text)
                     else:
-                        result["info"] = "range > 50 so no hash."
+                        result["info"] = f"range > {self.max_edit_lines=} so no hash."
 
                     return result
             except Exception as e:
@@ -158,7 +159,7 @@ class TextEditorServer:
                         "status": "success",
                         "message": "File created successfully",
                     }
-                    if len(text.splitlines()) <= 50:
+                    if len(text.splitlines()) <= self.max_edit_lines:
                         result["lines_hash"] = calculate_hash(text)
 
                     return result
@@ -259,7 +260,7 @@ class TextEditorServer:
                         "message": f"Text overwritten from line {line_start} to {line_end}",
                     }
 
-                    if len(new_lines) <= 50:
+                    if len(new_lines) <= self.max_edit_lines:
                         new_content = "".join(new_lines)
                         result["lines_hash"] = calculate_hash(
                             new_content, line_start, line_start + len(new_lines) - 1
