@@ -223,7 +223,7 @@ class TextEditor:
             patches (List[Dict[str, Any]]): List of patches to apply, each containing:
                 - start (int): Starting line number (1-based)
                 - end (Optional[int]): Ending line number (inclusive)
-                - contents (str): New content to insert (if empty string, consider using delete_text_file instead)
+                - contents (str): New content to insert
                 - range_hash (str): Expected hash of the content being replaced
 
         Returns:
@@ -282,7 +282,9 @@ class TextEditor:
                     )
                 elif current_file_hash != expected_file_hash:
                     suggestion = "patch"
-                    hint = "Please use get_text tool to get the current content and hash"
+                    hint = (
+                        "Please use get_text tool to get the current content and hash"
+                    )
 
                     return self.create_error_response(
                         "FileHash mismatch - Please use get_text tool to get current content and hashes, then retry with the updated hashes.",
@@ -413,8 +415,6 @@ class TextEditor:
                     return {
                         "result": "ok",
                         "file_hash": current_file_hash,  # Return current hash since no changes made
-                        "hint": "For content deletion, please consider using delete_text_file instead of patch with empty content",
-                        "suggestion": "delete",
                     }
 
                 # Set suggestions for alternative tools
@@ -590,161 +590,4 @@ class TextEditor:
                 "result": "error",
                 "reason": str(e),
                 "hash": None,
-            }
-
-    async def delete_text_file(
-        self,
-        request: DeleteTextFileContentsRequest,
-    ) -> Dict[str, Any]:
-        """Delete specified ranges from a text file with conflict detection.
-
-        Args:
-            request (DeleteTextFileContentsRequest): The request containing:
-                - file_path: Path to the text file
-                - file_hash: Expected hash of the file before editing
-                - ranges: List of ranges to delete
-                - encoding: Optional text encoding (default: utf-8)
-
-        Returns:
-            Dict[str, Any]: Results containing:
-                - result: "ok" or "error"
-                - hash: New file hash if successful
-                - reason: Error message if result is "error"
-        """
-        self._validate_file_path(request.file_path)
-
-        try:
-            (
-                current_content,
-                _,
-                _,
-                current_hash,
-                total_lines,
-                _,
-            ) = await self.read_file(
-                request.file_path,
-                encoding=request.encoding or "utf-8",
-            )
-
-            # Check for conflicts
-            if current_hash != request.file_hash:
-                return {
-                    request.file_path: {
-                        "result": "error",
-                        "reason": "File hash mismatch - Please use get_text tool to get current content and hash",
-                        "hash": current_hash,
-                    }
-                }
-
-            # Split content into lines
-            lines = current_content.splitlines(keepends=True)
-
-            # Sort ranges in reverse order to handle line number shifts
-            sorted_ranges = sorted(
-                request.ranges,
-                key=lambda x: (x.start, x.end or float("inf")),
-                reverse=True,
-            )
-
-            # Validate ranges
-            for i, range_ in enumerate(sorted_ranges):
-                if range_.start < 1:
-                    return {
-                        request.file_path: {
-                            "result": "error",
-                            "reason": f"Invalid start line {range_.start}",
-                            "hash": current_hash,
-                        }
-                    }
-
-                if range_.end and range_.end < range_.start:
-                    return {
-                        request.file_path: {
-                            "result": "error",
-                            "reason": f"End line {range_.end} is less than start line {range_.start}",
-                            "hash": current_hash,
-                        }
-                    }
-
-                if range_.start > total_lines:
-                    return {
-                        request.file_path: {
-                            "result": "error",
-                            "reason": f"Start line {range_.start} exceeds file length {total_lines}",
-                            "hash": current_hash,
-                        }
-                    }
-
-                end = range_.end or total_lines
-                if end > total_lines:
-                    return {
-                        request.file_path: {
-                            "result": "error",
-                            "reason": f"End line {end} exceeds file length {total_lines}",
-                            "hash": current_hash,
-                        }
-                    }
-
-                # Check for overlaps with next range
-                if i + 1 < len(sorted_ranges):
-                    next_range = sorted_ranges[i + 1]
-                    next_end = next_range.end or total_lines
-                    if next_end >= range_.start:
-                        return {
-                            request.file_path: {
-                                "result": "error",
-                                "reason": "Overlapping ranges detected",
-                                "hash": current_hash,
-                            }
-                        }
-
-            # Apply deletions
-            for range_ in sorted_ranges:
-                start_idx = range_.start - 1
-                end_idx = range_.end if range_.end else len(lines)
-
-                # Verify range content hash
-                range_content = "".join(lines[start_idx:end_idx])
-                if calculate_hash(range_content) != range_.range_hash:
-                    return {
-                        request.file_path: {
-                            "result": "error",
-                            "reason": f"Content hash mismatch for range {range_.start}-{range_.end}",
-                            "hash": current_hash,
-                        }
-                    }
-
-                del lines[start_idx:end_idx]
-
-            # Write the final content back to file
-            final_content = "".join(lines)
-            with open(request.file_path, "w", encoding=request.encoding) as f:
-                f.write(final_content)
-
-            # Calculate new hash
-            new_hash = calculate_hash(final_content)
-
-            return {
-                request.file_path: {
-                    "result": "ok",
-                    "hash": new_hash,
-                    "reason": None,
-                }
-            }
-
-        except FileNotFoundError:
-            return {
-                request.file_path: {
-                    "result": "error",
-                    "reason": f"File not found: {request.file_path}",
-                    "hash": None,
-                }
-            }
-        except Exception as e:
-            return {
-                request.file_path: {
-                    "result": "error",
-                    "reason": str(e),
-                    "hash": None,
-                }
             }

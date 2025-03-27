@@ -8,7 +8,6 @@
   - `insert_text_file`: Insert content at specific positions
   - `create_text_file`: Create new text files
   - `append_text_file`: Append content to existing files
-  - `delete_text_file`: Delete specified ranges of text
   - `edit_text`: Apply multiple patches to text files
 - Enhanced error messages with useful suggestions for alternative editing methods
 
