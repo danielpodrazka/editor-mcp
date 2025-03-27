@@ -71,7 +71,6 @@ class TextEditorServer:
         async def get_text(
             line_start: Optional[int] = None,
             line_end: Optional[int] = None,
-            include_line_numbers: Optional[bool] = True,
         ) -> Dict[str, Any]:
             """
             Read text from the current file.
@@ -79,10 +78,9 @@ class TextEditorServer:
             Args:
                 line_start (int, optional): Start line number (1-based indexing). If omitted but line_end is provided, starts at line 1.
                 line_end (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
-                include_line_numbers (bool, optional): If True, prefixes each line with its line number (e.g., "1 | line text").
 
             Returns:
-                dict: Dictionary containing the text (optionally with line numbers), and its hash if file has <= self.max_edit_lines lines
+                dict: Dictionary containing the text with each line prefixed with its line number (e.g., "1 | line text"), and lines range hash if file has <= self.max_edit_lines lines
             """
             result = {}
 
@@ -111,19 +109,14 @@ class TextEditorServer:
 
                     selected_lines = lines[line_start - 1 : line_end]
 
-                    if include_line_numbers:
-                        # Format text with line numbers
-                        numbered_lines = []
-                        max_line_num_width = len(str(line_end))
-                        for i, line in enumerate(selected_lines, start=line_start):
-                            numbered_lines.append(f"{i:{max_line_num_width}} | {line}")
-                        text = "".join(numbered_lines)
-                    else:
-                        text = "".join(selected_lines)
+                    numbered_lines = []
+                    max_line_num_width = len(str(line_end))
+                    for i, line in enumerate(selected_lines, start=line_start):
+                        numbered_lines.append(f"{i:{max_line_num_width}} | {line}")
+                    text = "".join(numbered_lines)
 
                     result["text"] = text
                     if len(selected_lines) <= self.max_edit_lines:
-                        # Use the original text without line numbers for hash calculation
                         original_text = "".join(selected_lines)
                         result["lines_hash"] = calculate_hash(
                             original_text, line_start, line_end
@@ -131,22 +124,13 @@ class TextEditorServer:
 
                     return result
                 else:
-                    if include_line_numbers:
-                        # Format entire file with line numbers
-                        numbered_lines = []
-                        max_line_num_width = len(str(len(lines)))
-                        for i, line in enumerate(lines, start=1):
-                            numbered_lines.append(f"{i:{max_line_num_width}} | {line}")
-                        text = "".join(numbered_lines)
-                    else:
-                        text = "".join(lines)
-
+                    numbered_lines = []
+                    max_line_num_width = len(str(len(lines)))
+                    for i, line in enumerate(lines, start=1):
+                        numbered_lines.append(f"{i:{max_line_num_width}} | {line}")
+                    text = "".join(numbered_lines)
                     result["text"] = text
-
-                    if len(lines) <= self.max_edit_lines:
-                        # Calculate hash based on original content without line numbers
-                        original_text = "".join(lines)
-                        result["lines_hash"] = calculate_hash(original_text)
+                    result["info"] = "No line_start/line_end provided so no hash"
 
                     return result
             except Exception as e:
