@@ -169,3 +169,20 @@ If you encounter issues:
 5. Confirm hash verification by reading content before attempting to edit it
 
 - Each test provides a detailed message when it fails
+
+
+## Sample MCP config entry
+
+```json
+{
+  "mcpServers": {
+     "text-editor": {
+       "command": "/home/daniel/pp/venvs/mcp-text-editor/bin/python",
+       "args": ["/home/daniel/pp/mcp-text-editor/src/text_editor/server.py"],
+        "env": {
+          "MAX_EDIT_LINES": "10"
+        }
+     }
+  }
+}
+```
