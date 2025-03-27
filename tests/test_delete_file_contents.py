@@ -6,6 +6,7 @@ import pytest
 
 from mcp_text_editor.models import DeleteTextFileContentsRequest, FileRange
 from mcp_text_editor.service import TextEditorService
+from mcp_text_editor.utils import calculate_hash
 
 
 @pytest.fixture
@@ -23,14 +24,14 @@ def test_delete_text_file_contents_basic(service, tmp_path):
     file_path = str(test_file)
 
     # Calculate initial hash
-    initial_hash = service.calculate_hash(test_content)
+    initial_hash = calculate_hash(test_content)
 
     # Create delete request
     request = DeleteTextFileContentsRequest(
         file_path=file_path,
         file_hash=initial_hash,
         ranges=[
-            FileRange(start=2, end=2, range_hash=service.calculate_hash("line2\n"))
+            FileRange(start=2, end=2, range_hash=calculate_hash("line2\n"))
         ],
         encoding="utf-8",
     )
@@ -59,7 +60,7 @@ def test_delete_text_file_contents_hash_mismatch(service, tmp_path):
         file_path=file_path,
         file_hash="incorrect_hash",
         ranges=[
-            FileRange(start=2, end=2, range_hash=service.calculate_hash("line2\n"))
+            FileRange(start=2, end=2, range_hash=calculate_hash("line2\n"))
         ],
         encoding="utf-8",
     )
@@ -81,7 +82,7 @@ def test_delete_text_file_contents_invalid_ranges(service, tmp_path):
     file_path = str(test_file)
 
     # Calculate initial hash
-    initial_hash = service.calculate_hash(test_content)
+    initial_hash = calculate_hash(test_content)
 
     # Create delete request with invalid ranges
     request = DeleteTextFileContentsRequest(
@@ -108,7 +109,7 @@ def test_delete_text_file_contents_range_hash_mismatch(service, tmp_path):
     file_path = str(test_file)
 
     # Calculate initial hash
-    initial_hash = service.calculate_hash(test_content)
+    initial_hash = calculate_hash(test_content)
 
     # Create delete request with incorrect range hash
     request = DeleteTextFileContentsRequest(
@@ -150,7 +151,7 @@ def test_delete_text_file_contents_empty_ranges(service, tmp_path):
     test_content = "line1\nline2\nline3\n"
     test_file.write_text(test_content)
     file_path = str(test_file)
-    content_hash = service.calculate_hash(test_content)
+    content_hash = calculate_hash(test_content)
 
     # Test empty ranges
     request = DeleteTextFileContentsRequest(
@@ -196,15 +197,15 @@ def test_delete_text_file_contents_multiple_ranges(service, tmp_path):
     file_path = str(test_file)
 
     # Calculate initial hash
-    initial_hash = service.calculate_hash(test_content)
+    initial_hash = calculate_hash(test_content)
 
     # Create delete request with multiple ranges
     request = DeleteTextFileContentsRequest(
         file_path=file_path,
         file_hash=initial_hash,
         ranges=[
-            FileRange(start=2, end=2, range_hash=service.calculate_hash("line2\n")),
-            FileRange(start=4, end=4, range_hash=service.calculate_hash("line4\n")),
+            FileRange(start=2, end=2, range_hash=calculate_hash("line2\n")),
+            FileRange(start=4, end=4, range_hash=calculate_hash("line4\n")),
         ],
         encoding="utf-8",
     )

@@ -1,6 +1,5 @@
 """Core service logic for the MCP Text Editor Server."""
 
-import hashlib
 from typing import Dict, List, Optional, Tuple
 
 from .models import (
@@ -10,15 +9,11 @@ from .models import (
     EditResult,
     FileRange,
 )
+from .utils import calculate_hash
 
 
 class TextEditorService:
     """Service class for text file operations."""
-
-    @staticmethod
-    def calculate_hash(content: str) -> str:
-        """Calculate SHA-256 hash of content."""
-        return hashlib.sha256(content.encode()).hexdigest()
 
     @staticmethod
     def read_file_contents(
@@ -62,7 +57,7 @@ class TextEditorService:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 current_content = f.read()
-                current_hash = self.calculate_hash(current_content)
+                current_hash = calculate_hash(current_content)
 
             # Check for conflicts
             if current_hash != operation.hash:
@@ -100,7 +95,7 @@ class TextEditorService:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(new_content)
 
-            new_hash = self.calculate_hash(new_content)
+            new_hash = calculate_hash(new_content)
             return {
                 file_path: EditResult(
                     result="ok",
@@ -131,11 +126,10 @@ class TextEditorService:
         request: DeleteTextFileContentsRequest,
     ) -> Dict[str, EditResult]:
         """Delete specified ranges from a text file with conflict detection."""
-        current_hash = None
         try:
             with open(request.file_path, "r", encoding=request.encoding) as f:
                 current_content = f.read()
-                current_hash = self.calculate_hash(current_content)
+                current_hash = calculate_hash(current_content)
 
             # Check for conflicts
             if current_hash != request.file_hash:
@@ -176,7 +170,7 @@ class TextEditorService:
                 start_idx = range_.start - 1
                 end_idx = range_.end if range_.end else len(lines)
                 target_content = "".join(lines[start_idx:end_idx])
-                target_hash = self.calculate_hash(target_content)
+                target_hash = calculate_hash(target_content)
                 if target_hash != range_.range_hash:
                     return {
                         request.file_path: EditResult(
@@ -192,7 +186,7 @@ class TextEditorService:
             with open(request.file_path, "w", encoding=request.encoding) as f:
                 f.write(new_content)
 
-            new_hash = self.calculate_hash(new_content)
+            new_hash = calculate_hash(new_content)
             return {
                 request.file_path: EditResult(
                     result="ok",

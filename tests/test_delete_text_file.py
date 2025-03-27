@@ -6,6 +6,7 @@ import pytest
 
 from mcp_text_editor.models import DeleteTextFileContentsRequest, FileRange
 from mcp_text_editor.text_editor import TextEditor
+from mcp_text_editor.utils import calculate_hash
 
 
 @pytest.fixture
@@ -30,7 +31,7 @@ async def test_delete_single_line(editor, test_file):
     original_lines = content.splitlines(keepends=True)
 
     # Get hash for line 2
-    line2_hash = editor.calculate_hash(original_lines[1])
+    line2_hash = calculate_hash(original_lines[1])
 
     # Create delete request
     request = DeleteTextFileContentsRequest(
@@ -60,7 +61,7 @@ async def test_delete_multiple_lines(editor, test_file):
     original_lines = content.splitlines(keepends=True)
 
     # Get hash for lines 2-4
-    lines_hash = editor.calculate_hash("".join(original_lines[1:4]))
+    lines_hash = calculate_hash("".join(original_lines[1:4]))
 
     # Create delete request
     request = DeleteTextFileContentsRequest(
@@ -87,7 +88,7 @@ async def test_delete_with_invalid_file_hash(editor, test_file):
     """Test deleting with an invalid file hash."""
     content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
     original_lines = content.splitlines(keepends=True)
-    line2_hash = editor.calculate_hash(original_lines[1])
+    line2_hash = calculate_hash(original_lines[1])
 
     request = DeleteTextFileContentsRequest(
         file_path=str(test_file),
@@ -136,7 +137,7 @@ async def test_delete_with_invalid_range_hash(editor, test_file):
 async def test_delete_with_invalid_range(editor, test_file):
     """Test deleting with invalid line range."""
     content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
-    line2_hash = editor.calculate_hash("Line 2\n")
+    line2_hash = calculate_hash("Line 2\n")
 
     request = DeleteTextFileContentsRequest(
         file_path=str(test_file),
@@ -194,8 +195,8 @@ async def test_delete_with_overlapping_ranges(editor, test_file):
 
     # Prepare hashes for the ranges
     lines = content.splitlines(keepends=True)
-    range1_hash = editor.calculate_hash("".join(lines[1:3]))  # Lines 2-3
-    range2_hash = editor.calculate_hash("".join(lines[2:4]))  # Lines 3-4
+    range1_hash = calculate_hash("".join(lines[1:3]))  # Lines 2-3
+    range2_hash = calculate_hash("".join(lines[2:4]))  # Lines 3-4
 
     request = DeleteTextFileContentsRequest(
         file_path=str(test_file),
@@ -228,8 +229,8 @@ async def test_delete_multiple_ranges(editor, test_file):
 
     # Prepare hashes for the ranges
     lines = content.splitlines(keepends=True)
-    range1_hash = editor.calculate_hash(lines[1])  # Line 2
-    range2_hash = editor.calculate_hash(lines[3])  # Line 4
+    range1_hash = calculate_hash(lines[1])  # Line 2
+    range2_hash = calculate_hash(lines[3])  # Line 4
 
     request = DeleteTextFileContentsRequest(
         file_path=str(test_file),

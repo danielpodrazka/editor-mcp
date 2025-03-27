@@ -6,7 +6,7 @@ import pytest
 
 from mcp_text_editor.models import EditFileOperation, EditPatch, EditResult
 from mcp_text_editor.service import TextEditorService
-
+from mcp_text_editor.utils import calculate_hash
 
 @pytest.fixture
 def service():
@@ -17,8 +17,8 @@ def service():
 def test_calculate_hash(service):
     """Test hash calculation."""
     content = "test content"
-    hash1 = service.calculate_hash(content)
-    hash2 = service.calculate_hash(content)
+    hash1 = calculate_hash(content)
+    hash2 = calculate_hash(content)
     assert hash1 == hash2
     assert isinstance(hash1, str)
     assert len(hash1) == 64  # SHA-256 hash length
@@ -75,7 +75,7 @@ def test_edit_file_contents(service, tmp_path):
     file_path = str(test_file)
 
     # Calculate initial hash
-    initial_hash = service.calculate_hash(test_content)
+    initial_hash = calculate_hash(test_content)
 
     # Create edit operation
     operation = EditFileOperation(
@@ -128,7 +128,7 @@ def test_edit_file_contents_invalid_patches(service, tmp_path):
     file_path = str(test_file)
 
     # Calculate initial hash
-    initial_hash = service.calculate_hash(test_content)
+    initial_hash = calculate_hash(test_content)
 
     # Create edit operation with invalid patches
     operation = EditFileOperation(
@@ -201,7 +201,7 @@ def test_edit_file_contents_permission_error(service, tmp_path):
     # Create edit operation
     operation = EditFileOperation(
         path=file_path,
-        hash=service.calculate_hash(test_content),
+        hash=calculate_hash(test_content),
         patches=[EditPatch(start=2, end=2, contents="new line2", range_hash="hash1")],
     )
 

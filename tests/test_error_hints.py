@@ -3,6 +3,7 @@
 import pytest
 
 from mcp_text_editor.text_editor import TextEditor
+from mcp_text_editor.utils import calculate_hash
 
 
 @pytest.fixture
@@ -62,13 +63,13 @@ async def test_overlapping_patches_hint(editor, tmp_path):
                 "start": 1,
                 "end": 2,
                 "contents": "new1\\n",
-                "range_hash": editor.calculate_hash("line1\\nline2\\n"),
+                "range_hash": calculate_hash("line1\\nline2\\n"),
             },
             {
                 "start": 2,
                 "end": 3,
                 "contents": "new2\\n",
-                "range_hash": editor.calculate_hash("line2\\nline3\\n"),
+                "range_hash": calculate_hash("line2\\nline3\\n"),
             },
         ],
     )
@@ -116,7 +117,7 @@ async def test_empty_content_delete_hint(editor, tmp_path):
                 "start": 1,
                 "end": 1,
                 "contents": "",
-                "range_hash": editor.calculate_hash("original\\n"),
+                "range_hash": calculate_hash("original\\n"),
             }
         ],
     )

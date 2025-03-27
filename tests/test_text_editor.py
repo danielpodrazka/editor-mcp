@@ -3,6 +3,7 @@
 import pytest
 
 from mcp_text_editor.text_editor import EditPatch, TextEditor
+from mcp_text_editor.utils import calculate_hash
 
 
 @pytest.fixture
@@ -16,7 +17,7 @@ async def test_edit_file_with_edit_patch_object(editor, tmp_path):
     """Test editing a file using EditPatch object."""
     test_file = tmp_path / "test.txt"
     test_file.write_text("line1\nline2\nline3\n")
-    file_hash = editor.calculate_hash(test_file.read_text())
+    file_hash = calculate_hash(test_file.read_text())
     first_line_content = "line1\n"
 
     # Create an EditPatch object
@@ -24,7 +25,7 @@ async def test_edit_file_with_edit_patch_object(editor, tmp_path):
         start=1,
         end=1,
         contents="new line\n",
-        range_hash=editor.calculate_hash(first_line_content),
+        range_hash=calculate_hash(first_line_content),
     )
 
     result = await editor.edit_file_contents(str(test_file), file_hash, [patch])
@@ -91,8 +92,8 @@ def test_invalid_encoding_file(tmp_path):
 async def test_calculate_hash(editor):
     """Test hash calculation."""
     content = "test content"
-    hash1 = editor.calculate_hash(content)
-    hash2 = editor.calculate_hash(content)
+    hash1 = calculate_hash(content)
+    hash2 = calculate_hash(content)
     assert hash1 == hash2
     assert isinstance(hash1, str)
     assert len(hash1) == 64  # SHA-256 hash length
@@ -188,7 +189,7 @@ async def test_update_file(editor, tmp_path):
                 "start": 2,
                 "end": 2,
                 "contents": new_content,
-                "range_hash": editor.calculate_hash("Line 2\n"),
+                "range_hash": calculate_hash("Line 2\n"),
             }
         ],
     )
@@ -232,7 +233,7 @@ async def test_file_hash_mismatch(editor, tmp_path):
                 "start": 2,
                 "end": 2,
                 "contents": "Updated Line\n",
-                "range_hash": editor.calculate_hash("Line 2\n"),
+                "range_hash": calculate_hash("Line 2\n"),
             }
         ],
     )
@@ -287,13 +288,13 @@ async def test_overlapping_patches(editor, tmp_path):
                 "start": 1,
                 "end": 2,
                 "contents": "New Line 1-2\n",
-                "range_hash": editor.calculate_hash("Line 1\nLine 2\n"),
+                "range_hash": calculate_hash("Line 1\nLine 2\n"),
             },
             {
                 "start": 2,
                 "end": 3,
                 "contents": "New Line 2-3\n",
-                "range_hash": editor.calculate_hash("Line 2\nLine 3\n"),
+                "range_hash": calculate_hash("Line 2\nLine 3\n"),
             },
         ],
     )
@@ -478,7 +479,7 @@ async def test_file_write_permission_error(editor, tmp_path):
                 "start": 1,
                 "end": 1,
                 "contents": "new content\n",
-                "range_hash": editor.calculate_hash("original content\n"),
+                "range_hash": calculate_hash("original content\n"),
             }
         ],
     )
@@ -509,7 +510,7 @@ async def test_edit_file_with_none_line_end(editor, tmp_path):
                 "start": 2,
                 "end": 3,  # Replace lines 2 and 3
                 "contents": "new2\nnew3\n",
-                "range_hash": editor.calculate_hash("line2\nline3\n"),
+                "range_hash": calculate_hash("line2\nline3\n"),
             }
         ],
     )
@@ -535,7 +536,7 @@ async def test_edit_file_with_exceeding_line_end(editor, tmp_path):
                 "start": 2,
                 "end": 10,  # File only has 3 lines
                 "contents": "new2\nnew3\n",
-                "range_hash": editor.calculate_hash("line2\nline3\n"),
+                "range_hash": calculate_hash("line2\nline3\n"),
             }
         ],
     )
@@ -579,7 +580,7 @@ async def test_read_file_contents_with_start_beyond_total(editor, tmp_path):
     assert content == ""
     assert start == 9  # start is converted to 0-based indexing
     assert end == 9
-    assert content_hash == editor.calculate_hash("")
+    assert content_hash == calculate_hash("")
     assert total_lines == 3
     assert content_size == 0
 
@@ -703,7 +704,7 @@ async def test_content_without_newline(editor, tmp_path):
                 "start": 2,
                 "end": 2,
                 "contents": "new line",  # No trailing newline
-                "range_hash": editor.calculate_hash("line2\n"),
+                "range_hash": calculate_hash("line2\n"),
             }
         ],
     )
@@ -743,7 +744,7 @@ async def test_invalid_line_range(editor, tmp_path):
                 "start": 3,
                 "end": 2,
                 "contents": "new content\n",
-                "range_hash": editor.calculate_hash("line3\n"),
+                "range_hash": calculate_hash("line3\n"),
             }
         ],
     )
@@ -794,14 +795,14 @@ async def test_dict_patch_with_defaults(editor: TextEditor, tmp_path):
     first_line_content, _, _, _, _, _ = await editor.read_file_contents(
         str(test_file), start=1, end=1
     )
-    file_hash = editor.calculate_hash(original_content)
+    file_hash = calculate_hash(original_content)
 
     # Edit using dict patch with missing optional fields
     patch = {
         "contents": "new line\n",  # Add newline to maintain file structure
         "start": 1,
         "end": 1,  # Explicitly specify end
-        "range_hash": editor.calculate_hash(first_line_content),
+        "range_hash": calculate_hash(first_line_content),
     }
     result = await editor.edit_file_contents(str(test_file), file_hash, [patch])
 
@@ -822,11 +823,11 @@ async def test_edit_file_without_end(editor, tmp_path):
         contents="new line\n",
         start=1,
         end=1,
-        range_hash=editor.calculate_hash("line1\n"),
+        range_hash=calculate_hash("line1\n"),
     )
 
     # Calculate file hash from original content
-    file_hash = editor.calculate_hash(content)
+    file_hash = calculate_hash(content)
 
     result = await editor.edit_file_contents(str(test_file), file_hash, [patch])
 
@@ -872,7 +873,7 @@ async def test_io_error_during_final_write(editor, tmp_path, monkeypatch):
                 "start": 1,
                 "end": 1,
                 "contents": "new content\n",
-                "range_hash": editor.calculate_hash("original content\n"),
+                "range_hash": calculate_hash("original content\n"),
             }
         ],
     )

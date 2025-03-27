@@ -1,12 +1,12 @@
 """Core text editor functionality with file operation handling."""
 
-import hashlib
 import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from .models import DeleteTextFileContentsRequest, EditPatch, FileRanges
 from .service import TextEditorService
+from .utils import calculate_hash
 
 logger = logging.getLogger(__name__)
 
@@ -82,18 +82,6 @@ class TextEditor:
         if ".." in path_str:
             raise ValueError("Path traversal not allowed")
 
-    @staticmethod
-    def calculate_hash(content: str) -> str:
-        """
-        Calculate SHA-256 hash of content.
-
-        Args:
-            content (str): Content to hash
-
-        Returns:
-            str: Hex digest of SHA-256 hash
-        """
-        return hashlib.sha256(content.encode()).hexdigest()
 
     async def _read_file(
         self, file_path: str, encoding: str = "utf-8"
@@ -139,7 +127,7 @@ class TextEditor:
             lines, file_content, total_lines = await self._read_file(
                 file_path, encoding=encoding
             )
-            file_hash = self.calculate_hash(file_content)
+            file_hash = calculate_hash(file_content)
             result[file_path] = {"ranges": [], "file_hash": file_hash}
 
             for range_spec in file_range.ranges:
@@ -158,7 +146,7 @@ class TextEditor:
                             "content": empty_content,
                             "start": start + 1,
                             "end": start + 1,
-                            "range_hash": self.calculate_hash(empty_content),
+                            "range_hash": calculate_hash(empty_content),
                             "total_lines": total_lines,
                             "content_size": 0,
                         }
@@ -167,7 +155,7 @@ class TextEditor:
 
                 selected_lines = lines[start:end]
                 content = "".join(selected_lines)
-                range_hash = self.calculate_hash(content)
+                range_hash = calculate_hash(content)
 
                 result[file_path]["ranges"].append(
                     {
@@ -201,14 +189,14 @@ class TextEditor:
 
         if start >= total_lines:
             empty_content = ""
-            empty_hash = self.calculate_hash(empty_content)
+            empty_hash = calculate_hash(empty_content)
             return empty_content, start, start, empty_hash, total_lines, 0
         if end < start:
             raise ValueError("End line must be greater than or equal to start line")
 
         selected_lines = lines[start:end]
         content = "".join(selected_lines)
-        content_hash = self.calculate_hash(content)
+        content_hash = calculate_hash(content)
         content_size = len(content.encode(encoding))
 
         return (
@@ -232,7 +220,7 @@ class TextEditor:
 
         Args:
             file_path (str): Path to the file to edit
-            expected_hash (str): Expected hash of the file before editing
+            expected_file_hash (str): Expected hash of the file before editing
             patches (List[Dict[str, Any]]): List of patches to apply, each containing:
                 - start (int): Starting line number (1-based)
                 - end (Optional[int]): Ending line number (inclusive)
@@ -245,7 +233,6 @@ class TextEditor:
                 - hash: New file hash if successful, None if error
                 - reason: Error message if result is "error"
                     "file_hash": None,
-                }
 
             # Read current file content and verify hash
         """
@@ -370,7 +357,7 @@ class TextEditor:
                         "reason": "File hash validation required: Empty hash provided for existing file",
                         "details": {
                             "file_path": file_path,
-                            "current_file_hash": self.calculate_hash(
+                            "current_file_hash": calculate_hash(
                                 current_file_content
                             ),
                             "expected_file_hash": expected_file_hash,
@@ -408,7 +395,7 @@ class TextEditor:
                         # Hash provided - verify content
                         target_lines = lines[start_zero : end_zero + 1]
                         target_content = "".join(target_lines)
-                        actual_range_hash = self.calculate_hash(target_content)
+                        actual_range_hash = calculate_hash(target_content)
 
                         if actual_range_hash != expected_range_hash:
                             return {
@@ -465,7 +452,7 @@ class TextEditor:
                 f.write(final_content)
 
             # Calculate new hash
-            new_hash = self.calculate_hash(final_content)
+            new_hash = calculate_hash(final_content)
 
             return {
                 "result": "ok",
@@ -587,7 +574,7 @@ class TextEditor:
                 f.write(final_content)
 
             # Calculate new hash
-            new_hash = self.calculate_hash(final_content)
+            new_hash = calculate_hash(final_content)
 
             return {
                 "result": "ok",
@@ -721,7 +708,7 @@ class TextEditor:
 
                 # Verify range content hash
                 range_content = "".join(lines[start_idx:end_idx])
-                if self.calculate_hash(range_content) != range_.range_hash:
+                if calculate_hash(range_content) != range_.range_hash:
                     return {
                         request.file_path: {
                             "result": "error",
@@ -738,7 +725,7 @@ class TextEditor:
                 f.write(final_content)
 
             # Calculate new hash
-            new_hash = self.calculate_hash(final_content)
+            new_hash = calculate_hash(final_content)
 
             return {
                 request.file_path: {
