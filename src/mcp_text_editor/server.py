@@ -11,7 +11,6 @@ from mcp.types import TextContent, Tool
 from .handlers import (
     AppendTextFileContentsHandler,
     CreateTextFileHandler,
-    DeleteTextFileContentsHandler,
     GetTextFileContentsHandler,
     PatchTextFileContentsHandler,
 )
@@ -28,7 +27,6 @@ get_contents_handler = GetTextFileContentsHandler()
 patch_file_handler = PatchTextFileContentsHandler()
 create_file_handler = CreateTextFileHandler()
 append_file_handler = AppendTextFileContentsHandler()
-delete_contents_handler = DeleteTextFileContentsHandler()
 
 
 @app.list_tools()
@@ -38,7 +36,6 @@ async def list_tools() -> List[Tool]:
         get_contents_handler.get_tool_description(),
         create_file_handler.get_tool_description(),
         append_file_handler.get_tool_description(),
-        delete_contents_handler.get_tool_description(),
         patch_file_handler.get_tool_description(),
     ]
 
@@ -54,8 +51,6 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
             return await create_file_handler.run_tool(arguments)
         elif name == append_file_handler.name:
             return await append_file_handler.run_tool(arguments)
-        elif name == delete_contents_handler.name:
-            return await delete_contents_handler.run_tool(arguments)
         elif name == patch_file_handler.name:
             return await patch_file_handler.run_tool(arguments)
         else:

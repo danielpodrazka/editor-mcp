@@ -15,7 +15,6 @@ from mcp_text_editor.server import (
     append_file_handler,
     call_tool,
     create_file_handler,
-    delete_contents_handler,
     get_contents_handler,
     list_tools,
     main,
@@ -27,7 +26,7 @@ from mcp_text_editor.server import (
 async def test_list_tools():
     """Test tool listing."""
     tools: List[Tool] = await list_tools()
-    assert len(tools) == 6
+    assert len(tools) == 4
 
     # Verify GetTextFileContents tool
     get_contents_tool = next(
@@ -227,7 +226,6 @@ async def test_call_tool_all_handlers(mocker: MockerFixture):
     handlers = [
         create_file_handler,
         append_file_handler,
-        delete_contents_handler,
         patch_file_handler,
     ]
 
