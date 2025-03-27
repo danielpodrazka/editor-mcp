@@ -71,9 +71,14 @@ class AppendTextFileContentsHandler(BaseHandler):
 
             # Check file contents and hash before modification
             # Get file information and verify hash
-            content, _, _, current_hash, total_lines, _ = (
-                await self.editor.read_file_contents(file_path, encoding=encoding)
-            )
+            (
+                content,
+                _,
+                _,
+                current_hash,
+                total_lines,
+                _,
+            ) = await self.editor.read_file_contents(file_path, encoding=encoding)
 
             # Verify file hash
             if current_hash != arguments["file_hash"]:

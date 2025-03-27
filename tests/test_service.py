@@ -8,6 +8,7 @@ from mcp_text_editor.models import EditFileOperation, EditPatch, EditResult
 from mcp_text_editor.service import TextEditorService
 from mcp_text_editor.utils import calculate_hash
 
+
 @pytest.fixture
 def service():
     """Create TextEditorService instance."""

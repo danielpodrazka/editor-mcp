@@ -82,7 +82,6 @@ class TextEditor:
         if ".." in path_str:
             raise ValueError("Path traversal not allowed")
 
-
     async def _read_file(
         self, file_path: str, encoding: str = "utf-8"
     ) -> Tuple[List[str], str, int]:
@@ -357,9 +356,7 @@ class TextEditor:
                         "reason": "File hash validation required: Empty hash provided for existing file",
                         "details": {
                             "file_path": file_path,
-                            "current_file_hash": calculate_hash(
-                                current_file_content
-                            ),
+                            "current_file_hash": calculate_hash(current_file_content),
                             "expected_file_hash": expected_file_hash,
                         },
                     }

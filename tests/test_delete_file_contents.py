@@ -30,9 +30,7 @@ def test_delete_text_file_contents_basic(service, tmp_path):
     request = DeleteTextFileContentsRequest(
         file_path=file_path,
         file_hash=initial_hash,
-        ranges=[
-            FileRange(start=2, end=2, range_hash=calculate_hash("line2\n"))
-        ],
+        ranges=[FileRange(start=2, end=2, range_hash=calculate_hash("line2\n"))],
         encoding="utf-8",
     )
 
@@ -59,9 +57,7 @@ def test_delete_text_file_contents_hash_mismatch(service, tmp_path):
     request = DeleteTextFileContentsRequest(
         file_path=file_path,
         file_hash="incorrect_hash",
-        ranges=[
-            FileRange(start=2, end=2, range_hash=calculate_hash("line2\n"))
-        ],
+        ranges=[FileRange(start=2, end=2, range_hash=calculate_hash("line2\n"))],
         encoding="utf-8",
     )
 

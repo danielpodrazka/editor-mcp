@@ -102,9 +102,14 @@ async def test_calculate_hash(editor):
 async def test_read_file_contents(editor, test_file):
     """Test reading file contents."""
     # Test reading entire file
-    content, start, end, hash_value, total_lines, size = (
-        await editor.read_file_contents(str(test_file))
-    )
+    (
+        content,
+        start,
+        end,
+        hash_value,
+        total_lines,
+        size,
+    ) = await editor.read_file_contents(str(test_file))
     assert content == "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
     assert start == 1
     assert end == 5
@@ -113,9 +118,14 @@ async def test_read_file_contents(editor, test_file):
     assert size == len(content)
 
     # Test reading specific lines
-    content, start, end, hash_value, total_lines, size = (
-        await editor.read_file_contents(str(test_file), start=2, end=4)
-    )
+    (
+        content,
+        start,
+        end,
+        hash_value,
+        total_lines,
+        size,
+    ) = await editor.read_file_contents(str(test_file), start=2, end=4)
     assert content == "Line 2\nLine 3\nLine 4\n"
     assert start == 2
     assert end == 4
@@ -571,9 +581,14 @@ async def test_read_file_contents_with_start_beyond_total(editor, tmp_path):
     test_file.write_text("line1\nline2\nline3\n")
 
     # Call read_file_contents with start beyond total lines
-    content, start, end, content_hash, total_lines, content_size = (
-        await editor.read_file_contents(str(test_file), start=10)
-    )
+    (
+        content,
+        start,
+        end,
+        content_hash,
+        total_lines,
+        content_size,
+    ) = await editor.read_file_contents(str(test_file), start=10)
 
     # Verify empty content is returned
     assert content == ""
