@@ -90,8 +90,6 @@ class TextEditorServer:
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
-                    if len(lines) <= self.max_edit_lines:
-                        result["info"] = f"range > {self.max_edit_lines=} so no hash."
                 if line_start is not None or line_end is not None:
                     if line_start is None:
                         line_start = 1
@@ -121,7 +119,10 @@ class TextEditorServer:
                         result["lines_hash"] = calculate_hash(
                             original_text, line_start, line_end
                         )
-
+                    else:
+                        result["info"] = (
+                            f"{len(selected_lines)=} > {self.max_edit_lines=} so no hash."
+                        )
                     return result
                 else:
                     numbered_lines = []
@@ -131,7 +132,6 @@ class TextEditorServer:
                     text = "".join(numbered_lines)
                     result["text"] = text
                     result["info"] = "No line_start/line_end provided so no hash"
-
                     return result
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
