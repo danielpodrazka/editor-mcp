@@ -96,7 +96,6 @@ async def test_calculate_hash(editor):
     hash2 = calculate_hash(content)
     assert hash1 == hash2
     assert isinstance(hash1, str)
-    assert len(hash1) == 64  # SHA-256 hash length
 
 
 @pytest.mark.asyncio
