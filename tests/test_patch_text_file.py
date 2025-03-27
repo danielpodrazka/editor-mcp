@@ -40,7 +40,7 @@ async def test_patch_text_file_middle(tmp_path):
         "contents": new_content,
         "range_hash": range_hash,
     }
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         file_hash,
         [patch],
@@ -82,7 +82,7 @@ async def test_patch_text_file_empty_content(tmp_path):
         "contents": "",
         "range_hash": range_hash,
     }
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         file_hash,
         [patch],
@@ -150,7 +150,7 @@ async def test_patch_text_file_unexpected_error(tmp_path, mocker):
         raise Exception("Unexpected test error")
 
     # Patch the editor's method using mocker
-    mocker.patch.object(editor, "edit_file_contents", mock_edit_file_contents)
+    mocker.patch.object(editor, "edit_file", mock_edit_file_contents)
 
     # Try to patch the file with the mocked error
     with pytest.raises(
@@ -216,7 +216,7 @@ async def test_patch_text_file_overlapping(tmp_path):
     ]
 
     # Try to apply overlapping patches
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         file_hash,
         patches,
@@ -238,7 +238,7 @@ async def test_patch_text_file_new_file_hint(tmp_path):
         "contents": "new content\n",
         "range_hash": "",  # Empty hash for new file
     }
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         "",  # Empty hash for new file
         [patch],
@@ -273,7 +273,7 @@ async def test_patch_text_file_append_hint(tmp_path):
         "contents": "new line\n",
         "range_hash": "",  # Empty hash for insertion
     }
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         file_hash,
         [patch],
@@ -308,7 +308,7 @@ async def test_patch_text_file_insert_hint(tmp_path):
         "contents": "new line\n",
         "range_hash": "",  # Empty hash for insertion
     }
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         file_hash,
         [patch],
@@ -337,7 +337,7 @@ async def test_patch_text_file_hash_mismatch_hint(tmp_path):
         "contents": "new line\n",
         "range_hash": "",
     }
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         "wrong_hash",
         [patch],

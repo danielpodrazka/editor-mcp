@@ -207,7 +207,7 @@ class TextEditor:
             content_size,
         )
 
-    async def edit_file_contents(
+    async def edit_file(
         self,
         file_path: str,
         expected_file_hash: str,

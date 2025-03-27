@@ -90,7 +90,7 @@ class AppendTextFileContentsHandler(BaseHandler):
                 append_content += "\n"
 
             # Create patch for append operation
-            result = await self.editor.edit_file_contents(
+            result = await self.editor.edit_file(
                 file_path,
                 expected_file_hash=arguments["file_hash"],
                 patches=[

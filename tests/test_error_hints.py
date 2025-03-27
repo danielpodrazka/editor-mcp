@@ -17,7 +17,7 @@ async def test_file_not_found_hint(editor, tmp_path):
     """Test hints when file is not found."""
     non_existent = tmp_path / "non_existent.txt"
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(non_existent),
         "non_empty_hash",
         [{"start": 1, "contents": "test", "range_hash": ""}],
@@ -35,7 +35,7 @@ async def test_hash_mismatch_hint(editor, tmp_path):
     test_file = tmp_path / "test.txt"
     test_file.write_text("original content\\n")
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "wrong_hash",
         [{"start": 1, "contents": "new content", "range_hash": ""}],
@@ -55,7 +55,7 @@ async def test_overlapping_patches_hint(editor, tmp_path):
 
     content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -91,7 +91,7 @@ async def test_io_error_hint(editor, tmp_path, monkeypatch):
 
     monkeypatch.setattr("builtins.open", mock_open)
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file), "", [{"start": 1, "contents": "new content\\n"}]
     )
 
@@ -109,7 +109,7 @@ async def test_empty_content_delete_hint(editor, tmp_path):
 
     content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -132,7 +132,7 @@ async def test_append_suggestion_for_new_file(editor, tmp_path):
     """Test suggestion to use append for new files."""
     test_file = tmp_path / "new.txt"
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "",
         [{"start": 1, "contents": "new content\\n", "range_hash": ""}],

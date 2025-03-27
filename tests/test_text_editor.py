@@ -28,7 +28,7 @@ async def test_edit_file_with_edit_patch_object(editor, tmp_path):
         range_hash=calculate_hash(first_line_content),
     )
 
-    result = await editor.edit_file_contents(str(test_file), file_hash, [patch])
+    result = await editor.edit_file(str(test_file), file_hash, [patch])
 
     assert result["result"] == "ok"
     assert test_file.read_text() == "new line\nline2\nline3\n"
@@ -52,7 +52,7 @@ async def test_directory_creation_error(editor, tmp_path, mocker):
     # Mock os.makedirs to raise an OSError
     mocker.patch("os.makedirs", side_effect=OSError("Permission denied"))
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file), "", [EditPatch(contents="test content\n", range_hash="")]
     )
 
@@ -145,7 +145,7 @@ async def test_encoding_error(editor, test_invalid_encoding_file):
     assert "utf-8" in str(excinfo.value)
 
     # Try to read Shift-JIS file with incorrect encoding in edit_file_contents
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         test_invalid_encoding_file,
         "dummy_hash",
         [{"start": 1, "contents": "test", "range_hash": "dummy_hash"}],
@@ -164,7 +164,7 @@ async def test_create_new_file(editor, tmp_path):
     content = "New file content\nLine 2\n"
 
     # Test creating a new file
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(new_file),
         "",  # No hash for new file
         [
@@ -190,7 +190,7 @@ async def test_update_file(editor, tmp_path):
 
     # Update the second line
     new_content = "Updated Line 2\n"
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -214,7 +214,7 @@ async def test_create_file_in_new_directory(editor, tmp_path):
     new_file = tmp_path / "subdir" / "nested" / "test.txt"
     content = "Content in nested directory\n"
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(new_file),
         "",  # No hash for new file
         [
@@ -234,7 +234,7 @@ async def test_file_hash_mismatch(editor, tmp_path):
     original_content = "Line 1\nLine 2\nLine 3\n"
     test_file.write_text(original_content)
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "invalid_hash",  # Wrong hash
         [
@@ -267,7 +267,7 @@ async def test_path_traversal_prevention(editor, tmp_path):
 
     # Test write operation
     with pytest.raises(ValueError) as excinfo:
-        await editor.edit_file_contents(
+        await editor.edit_file(
             unsafe_path,
             "",
             [{"start": 1, "contents": "malicious content\n", "range_hash": None}],
@@ -289,7 +289,7 @@ async def test_overlapping_patches(editor, tmp_path):
     )
 
     # Try to apply overlapping patches
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -329,7 +329,7 @@ async def test_empty_content_handling(editor, tmp_path):
     assert size == 0
 
     # Write to empty file (treat it as a new file)
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "",  # No hash for empty file
         [
@@ -378,7 +378,7 @@ async def test_directory_creation_failure(editor, tmp_path):
     base_dir.write_text("")
     test_file = base_dir / "subdir" / "test.txt"
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "",  # New file
         [{"line_start": 1, "contents": "test content\n", "range_hash": None}],
@@ -399,7 +399,7 @@ async def test_invalid_encoding_file_operations(editor, tmp_path):
         f.write(test_data)
 
     # Test encoding error in file operations
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "",  # hash doesn't matter as it will fail before hash check
         [{"line_start": 1, "contents": "new content\n", "range_hash": None}],
@@ -424,7 +424,7 @@ async def test_create_file_directory_error(editor, tmp_path, monkeypatch):
     monkeypatch.setattr("os.makedirs", mock_makedirs)
 
     # Attempt to create a new file
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(deep_path),
         "",  # Empty hash for new file
         [
@@ -450,7 +450,7 @@ async def test_create_file_with_empty_directory(editor, tmp_path):
     file_path = tmp_path / "test.txt"
 
     # Attempt to create a new file
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         "",  # Empty hash for new file
         [
@@ -480,7 +480,7 @@ async def test_file_write_permission_error(editor, tmp_path):
     content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Attempt to modify read-only file
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -511,7 +511,7 @@ async def test_edit_file_with_none_line_end(editor, tmp_path):
     content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Test replacement with None as end
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -537,7 +537,7 @@ async def test_edit_file_with_exceeding_line_end(editor, tmp_path):
     content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Test replacement with end > file length
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -561,7 +561,7 @@ async def test_edit_file_with_exceeding_line_end(editor, tmp_path):
 async def test_new_file_with_non_empty_hash(editor, tmp_path):
     """Test handling of new file creation with non-empty hash."""
     new_file = tmp_path / "nonexistent.txt"
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(new_file),
         "non_empty_hash",  # Non-empty hash for non-existent file
         [{"start": 1, "contents": "test content\n", "range_hash": ""}],
@@ -612,7 +612,7 @@ async def test_create_file_directory_creation_failure(editor, tmp_path, monkeypa
     monkeypatch.setattr("os.makedirs", mock_makedirs)
 
     # Attempt to create a new file
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(deep_path),
         "",  # Empty hash for new file
         [
@@ -643,7 +643,7 @@ async def test_io_error_handling(editor, tmp_path, monkeypatch):
 
     monkeypatch.setattr("builtins.open", mock_open)
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "",
         [{"line_start": 1, "contents": "new content\n"}],
@@ -664,7 +664,7 @@ async def test_exception_handling(editor, tmp_path, monkeypatch):
 
     monkeypatch.setattr("builtins.open", mock_open)
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "",
         [{"line_start": 1, "contents": "new content\n"}],
@@ -683,7 +683,7 @@ async def test_insert_operation(editor, tmp_path):
     content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Test insertion operation (inserting at line 2)
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -710,7 +710,7 @@ async def test_content_without_newline(editor, tmp_path):
     content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Update with content that doesn't have a trailing newline
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -725,7 +725,7 @@ async def test_content_without_newline(editor, tmp_path):
 
     assert result["result"] == "ok"
     assert test_file.read_text() == "line1\nnew line\nline3\n"
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         "",
         [{"start": 1, "contents": "new content\n"}],
@@ -750,7 +750,7 @@ async def test_invalid_line_range(editor, tmp_path):
     # Try to edit with invalid line range
     content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -782,7 +782,7 @@ async def test_append_mode(editor, tmp_path):
 
     # Attempt to append content with start > total_lines
     append_content = "Appended Line\n"
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [
@@ -818,7 +818,7 @@ async def test_dict_patch_with_defaults(editor: TextEditor, tmp_path):
         "end": 1,  # Explicitly specify end
         "range_hash": calculate_hash(first_line_content),
     }
-    result = await editor.edit_file_contents(str(test_file), file_hash, [patch])
+    result = await editor.edit_file(str(test_file), file_hash, [patch])
 
     assert result["result"] == "ok"
     # Should replace line 1 when range_hash is provided
@@ -843,7 +843,7 @@ async def test_edit_file_without_end(editor, tmp_path):
     # Calculate file hash from original content
     file_hash = calculate_hash(content)
 
-    result = await editor.edit_file_contents(str(test_file), file_hash, [patch])
+    result = await editor.edit_file(str(test_file), file_hash, [patch])
 
     assert result["result"] == "ok"
     assert test_file.read_text() == "new line\nline2\nline3\n"
@@ -879,7 +879,7 @@ async def test_io_error_during_final_write(editor, tmp_path, monkeypatch):
     monkeypatch.setattr("builtins.open", mock_open)
 
     # Try to edit file with mocked write error
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(test_file),
         file_hash,
         [

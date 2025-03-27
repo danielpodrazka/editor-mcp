@@ -42,7 +42,7 @@ async def test_patch_text_file_end_none(tmp_path):
         "contents": new_content,
         "range_hash": range_hash,
     }
-    result = await editor.edit_file_contents(
+    result = await editor.edit_file(
         str(file_path),
         file_hash,
         [patch],
