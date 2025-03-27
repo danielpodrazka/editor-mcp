@@ -1,4 +1,4 @@
-"""Test module for patch_text_file with end=None."""
+"""Test module for edit_text with end=None."""
 
 import os
 
@@ -8,7 +8,7 @@ from mcp_text_editor.text_editor import TextEditor
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_end_none(tmp_path):
+async def test_edit_text_end_none(tmp_path):
     """Test patching text file with end=None."""
     # Create a test file
     file_path = os.path.join(tmp_path, "test.txt")

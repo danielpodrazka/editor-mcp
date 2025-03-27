@@ -231,7 +231,7 @@ Parameters:
 }
 ```
 
-#### patch_text_file
+#### edit_text
 
 Apply patches to text files with robust error handling and conflict detection. Supports editing multiple files in a single operation.
 

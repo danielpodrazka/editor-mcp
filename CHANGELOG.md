@@ -9,7 +9,7 @@
   - `create_text_file`: Create new text files
   - `append_text_file`: Append content to existing files
   - `delete_text_file`: Delete specified ranges of text
-  - `patch_text_file`: Apply multiple patches to text files
+  - `edit_text`: Apply multiple patches to text files
 - Enhanced error messages with useful suggestions for alternative editing methods
 
 ### Changed

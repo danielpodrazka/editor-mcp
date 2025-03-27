@@ -1,17 +1,17 @@
-"""Test module for patch_text_file."""
+"""Test module for edit_text."""
 
 import os
 
 import pytest
 
-from mcp_text_editor.handlers.patch_text_file import (
-    PatchTextFileContentsHandler,
+from mcp_text_editor.handlers.edit_text import (
+    EditTextHandler,
 )
 from mcp_text_editor.text_editor import TextEditor
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_middle(tmp_path):
+async def test_edit_text_middle(tmp_path):
     """Test patching text in the middle of the file."""
     # Create a test file
     file_path = os.path.join(tmp_path, "test.txt")
@@ -54,7 +54,7 @@ async def test_patch_text_file_middle(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_empty_content(tmp_path):
+async def test_edit_text_empty_content(tmp_path):
     """Test patching with empty content suggests using delete_text_file."""
     # Create a test file
     file_path = os.path.join(tmp_path, "test.txt")
@@ -101,10 +101,10 @@ async def test_patch_text_file_empty_content(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_errors(tmp_path):
+async def test_edit_text_errors(tmp_path):
     """Test error handling when patching a file."""
     editor = TextEditor()
-    handler = PatchTextFileContentsHandler(editor)
+    handler = EditTextHandler(editor)
     file_path = os.path.join(tmp_path, "test.txt")
     non_existent_file = os.path.join(tmp_path, "non_existent.txt")
     relative_path = "test.txt"
@@ -135,10 +135,10 @@ async def test_patch_text_file_errors(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_unexpected_error(tmp_path, mocker):
+async def test_edit_text_unexpected_error(tmp_path, mocker):
     """Test handling of unexpected errors during patching."""
     editor = TextEditor()
-    handler = PatchTextFileContentsHandler(editor)
+    handler = EditTextHandler(editor)
     file_path = os.path.join(tmp_path, "test.txt")
 
     # Create a test file
@@ -172,7 +172,7 @@ async def test_patch_text_file_unexpected_error(tmp_path, mocker):
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_overlapping(tmp_path):
+async def test_edit_text_overlapping(tmp_path):
     """Test patching text with overlapping ranges should fail."""
     # Create a test file
     file_path = os.path.join(tmp_path, "test.txt")
@@ -227,7 +227,7 @@ async def test_patch_text_file_overlapping(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_new_file_hint(tmp_path):
+async def test_edit_text_new_file_hint(tmp_path):
     """Test patching a new file suggests using append_text_file."""
     file_path = os.path.join(tmp_path, "new.txt")
     editor = TextEditor()
@@ -251,7 +251,7 @@ async def test_patch_text_file_new_file_hint(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_append_hint(tmp_path):
+async def test_edit_text_append_hint(tmp_path):
     """Test patching beyond file end suggests using append_text_file."""
     file_path = os.path.join(tmp_path, "test.txt")
     editor = TextEditor()
@@ -286,7 +286,7 @@ async def test_patch_text_file_append_hint(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_insert_hint(tmp_path):
+async def test_edit_text_insert_hint(tmp_path):
     """Test patching with insertion suggests using insert_text_file."""
     file_path = os.path.join(tmp_path, "test.txt")
     editor = TextEditor()
@@ -321,7 +321,7 @@ async def test_patch_text_file_insert_hint(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_patch_text_file_hash_mismatch_hint(tmp_path):
+async def test_edit_text_hash_mismatch_hint(tmp_path):
     """Test patching with wrong hash suggests using get_text."""
     file_path = os.path.join(tmp_path, "test.txt")
     editor = TextEditor()

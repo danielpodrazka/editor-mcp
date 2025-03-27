@@ -13,10 +13,10 @@ from .base import BaseHandler
 logger = logging.getLogger("mcp-text-editor")
 
 
-class PatchTextFileContentsHandler(BaseHandler):
+class EditTextHandler(BaseHandler):
     """Handler for patching a text file."""
 
-    name = "patch_text_file"
+    name = "edit_text"
     description = "Apply patches to text files with hash-based validation for concurrency control."
 
     def get_tool_description(self) -> Tool:
