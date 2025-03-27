@@ -169,7 +169,7 @@ class TextEditor:
 
         return result
 
-    async def read_file_contents(
+    async def read_file(
         self,
         file_path: str,
         start: int = 1,
@@ -269,7 +269,7 @@ class TextEditor:
                     current_file_hash,
                     total_lines,
                     _,
-                ) = await self.read_file_contents(file_path, encoding=encoding)
+                ) = await self.read_file(file_path, encoding=encoding)
 
                 # Treat empty file as new file
                 if not current_file_content:
@@ -524,7 +524,7 @@ class TextEditor:
                 current_hash,
                 total_lines,
                 _,
-            ) = await self.read_file_contents(
+            ) = await self.read_file(
                 file_path,
                 encoding=encoding,
             )
@@ -621,7 +621,7 @@ class TextEditor:
                 current_hash,
                 total_lines,
                 _,
-            ) = await self.read_file_contents(
+            ) = await self.read_file(
                 request.file_path,
                 encoding=request.encoding or "utf-8",
             )

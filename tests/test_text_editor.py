@@ -64,7 +64,7 @@ async def test_directory_creation_error(editor, tmp_path, mocker):
 @pytest.mark.asyncio
 async def test_missing_range_hash(editor, test_file):
     """Test editing without required range hash."""
-    _, _, _, file_hash, _, _ = await editor.read_file_contents(test_file)
+    _, _, _, file_hash, _, _ = await editor.read_file(test_file)
 
     # Try to edit without range_hash
     with pytest.raises(ValueError, match="range_hash is required"):
@@ -109,7 +109,7 @@ async def test_read_file_contents(editor, test_file):
         hash_value,
         total_lines,
         size,
-    ) = await editor.read_file_contents(str(test_file))
+    ) = await editor.read_file(str(test_file))
     assert content == "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
     assert start == 1
     assert end == 5
@@ -125,7 +125,7 @@ async def test_read_file_contents(editor, test_file):
         hash_value,
         total_lines,
         size,
-    ) = await editor.read_file_contents(str(test_file), start=2, end=4)
+    ) = await editor.read_file(str(test_file), start=2, end=4)
     assert content == "Line 2\nLine 3\nLine 4\n"
     assert start == 2
     assert end == 4
@@ -139,7 +139,7 @@ async def test_encoding_error(editor, test_invalid_encoding_file):
     """Test handling of encoding errors when reading a file with incorrect encoding."""
     # Try to read Shift-JIS file with UTF-8 encoding
     with pytest.raises(UnicodeDecodeError) as excinfo:
-        await editor.read_file_contents(test_invalid_encoding_file, encoding="utf-8")
+        await editor.read_file(test_invalid_encoding_file, encoding="utf-8")
 
     assert "Failed to decode file" in str(excinfo.value)
     assert "utf-8" in str(excinfo.value)
@@ -184,7 +184,7 @@ async def test_update_file(editor, tmp_path):
     test_file.write_text(original_content)
 
     # Read the content and get hash
-    content, start, end, file_hash, total_lines, size = await editor.read_file_contents(
+    content, start, end, file_hash, total_lines, size = await editor.read_file(
         str(test_file)
     )
 
@@ -262,7 +262,7 @@ async def test_path_traversal_prevention(editor, tmp_path):
 
     # Test read operation
     with pytest.raises(ValueError) as excinfo:
-        await editor.read_file_contents(unsafe_path)
+        await editor.read_file(unsafe_path)
     assert "Path traversal not allowed" in str(excinfo.value)
 
     # Test write operation
@@ -284,7 +284,7 @@ async def test_overlapping_patches(editor, tmp_path):
     test_file.write_text(original_content)
 
     # Get file hash
-    content, start, end, file_hash, total_lines, size = await editor.read_file_contents(
+    content, start, end, file_hash, total_lines, size = await editor.read_file(
         str(test_file)
     )
 
@@ -321,7 +321,7 @@ async def test_empty_content_handling(editor, tmp_path):
     test_file.write_text("")
 
     # Read empty file
-    content, start, end, file_hash, total_lines, size = await editor.read_file_contents(
+    content, start, end, file_hash, total_lines, size = await editor.read_file(
         str(test_file)
     )
     assert content == ""
@@ -477,7 +477,7 @@ async def test_file_write_permission_error(editor, tmp_path):
     test_file.chmod(0o444)  # Make file read-only
 
     # Get file hash
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Attempt to modify read-only file
     result = await editor.edit_file_contents(
@@ -508,7 +508,7 @@ async def test_edit_file_with_none_line_end(editor, tmp_path):
     test_file.write_text("line1\nline2\nline3\n")
 
     # Get file hash
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Test replacement with None as end
     result = await editor.edit_file_contents(
@@ -534,7 +534,7 @@ async def test_edit_file_with_exceeding_line_end(editor, tmp_path):
     test_file.write_text("line1\nline2\nline3\n")
 
     # Get file hash
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Test replacement with end > file length
     result = await editor.edit_file_contents(
@@ -588,7 +588,7 @@ async def test_read_file_contents_with_start_beyond_total(editor, tmp_path):
         content_hash,
         total_lines,
         content_size,
-    ) = await editor.read_file_contents(str(test_file), start=10)
+    ) = await editor.read_file(str(test_file), start=10)
 
     # Verify empty content is returned
     assert content == ""
@@ -680,7 +680,7 @@ async def test_insert_operation(editor, tmp_path):
     test_file.write_text("line1\nline2\nline3\n")
 
     # Get file hash
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Test insertion operation (inserting at line 2)
     result = await editor.edit_file_contents(
@@ -707,7 +707,7 @@ async def test_content_without_newline(editor, tmp_path):
     test_file.write_text("line1\nline2\nline3\n")
 
     # Get file hash
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Update with content that doesn't have a trailing newline
     result = await editor.edit_file_contents(
@@ -743,12 +743,12 @@ async def test_invalid_line_range(editor, tmp_path):
 
     # Try to read with invalid line range
     with pytest.raises(ValueError) as excinfo:
-        await editor.read_file_contents(str(test_file), start=3, end=2)
+        await editor.read_file(str(test_file), start=3, end=2)
 
     assert "End line must be greater than or equal to start line" in str(excinfo.value)
 
     # Try to edit with invalid line range
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     result = await editor.edit_file_contents(
         str(test_file),
@@ -776,7 +776,7 @@ async def test_append_mode(editor, tmp_path):
     test_file.write_text(original_content)
 
     # Read the content and get hash
-    content, start, end, file_hash, total_lines, size = await editor.read_file_contents(
+    content, start, end, file_hash, total_lines, size = await editor.read_file(
         str(test_file)
     )
 
@@ -806,7 +806,7 @@ async def test_dict_patch_with_defaults(editor: TextEditor, tmp_path):
     test_file.write_text(original_content)
 
     # Get first line content and calculate hashes
-    first_line_content, _, _, _, _, _ = await editor.read_file_contents(
+    first_line_content, _, _, _, _, _ = await editor.read_file(
         str(test_file), start=1, end=1
     )
     file_hash = calculate_hash(original_content)
@@ -863,7 +863,7 @@ async def test_io_error_during_final_write(editor, tmp_path, monkeypatch):
     test_file.write_text("original content\n")
 
     # Get file hash
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Mock open to raise IOError during final write
     original_open = open

@@ -78,7 +78,7 @@ class AppendTextFileContentsHandler(BaseHandler):
                 current_hash,
                 total_lines,
                 _,
-            ) = await self.editor.read_file_contents(file_path, encoding=encoding)
+            ) = await self.editor.read_file(file_path, encoding=encoding)
 
             # Verify file hash
             if current_hash != arguments["file_hash"]:

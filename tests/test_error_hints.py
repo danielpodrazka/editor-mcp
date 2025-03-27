@@ -53,7 +53,7 @@ async def test_overlapping_patches_hint(editor, tmp_path):
     test_file = tmp_path / "test.txt"
     test_file.write_text("line1\\nline2\\nline3\\n")
 
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     result = await editor.edit_file_contents(
         str(test_file),
@@ -107,7 +107,7 @@ async def test_empty_content_delete_hint(editor, tmp_path):
     test_file = tmp_path / "test.txt"
     test_file.write_text("original\\n")
 
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     result = await editor.edit_file_contents(
         str(test_file),

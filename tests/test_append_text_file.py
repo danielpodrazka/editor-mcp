@@ -38,7 +38,7 @@ async def test_append_text_file_success(test_dir: str, cleanup_files: None) -> N
 
     # Get file hash for append operation
     editor = TextEditor()
-    _, _, _, file_hash, _, _ = await editor.read_file_contents(test_file)
+    _, _, _, file_hash, _, _ = await editor.read_file(test_file)
 
     # Append content using handler
     arguments: Dict[str, Any] = {
@@ -157,7 +157,7 @@ async def test_append_text_file_custom_encoding(
 
     # Get file hash for append operation
     editor = TextEditor()
-    _, _, _, file_hash, _, _ = await editor.read_file_contents(
+    _, _, _, file_hash, _, _ = await editor.read_file(
         test_file, encoding="utf-8"
     )
 

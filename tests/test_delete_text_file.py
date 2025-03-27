@@ -27,7 +27,7 @@ def test_file(tmp_path) -> Path:
 async def test_delete_single_line(editor, test_file):
     """Test deleting a single line from file."""
     # Get initial content and file hash
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
     original_lines = content.splitlines(keepends=True)
 
     # Get hash for line 2
@@ -57,7 +57,7 @@ async def test_delete_single_line(editor, test_file):
 async def test_delete_multiple_lines(editor, test_file):
     """Test deleting multiple consecutive lines from file."""
     # Get initial content and file hash
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
     original_lines = content.splitlines(keepends=True)
 
     # Get hash for lines 2-4
@@ -86,7 +86,7 @@ async def test_delete_multiple_lines(editor, test_file):
 @pytest.mark.asyncio
 async def test_delete_with_invalid_file_hash(editor, test_file):
     """Test deleting with an invalid file hash."""
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
     original_lines = content.splitlines(keepends=True)
     line2_hash = calculate_hash(original_lines[1])
 
@@ -112,7 +112,7 @@ async def test_delete_with_invalid_file_hash(editor, test_file):
 @pytest.mark.asyncio
 async def test_delete_with_invalid_range_hash(editor, test_file):
     """Test deleting with an invalid range hash."""
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     request = DeleteTextFileContentsRequest(
         file_path=str(test_file),
@@ -136,7 +136,7 @@ async def test_delete_with_invalid_range_hash(editor, test_file):
 @pytest.mark.asyncio
 async def test_delete_with_invalid_range(editor, test_file):
     """Test deleting with invalid line range."""
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
     line2_hash = calculate_hash("Line 2\n")
 
     request = DeleteTextFileContentsRequest(
@@ -164,7 +164,7 @@ async def test_delete_with_invalid_range(editor, test_file):
 @pytest.mark.asyncio
 async def test_delete_with_out_of_range(editor, test_file):
     """Test deleting lines beyond file length."""
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     request = DeleteTextFileContentsRequest(
         file_path=str(test_file),
@@ -191,7 +191,7 @@ async def test_delete_with_out_of_range(editor, test_file):
 @pytest.mark.asyncio
 async def test_delete_with_overlapping_ranges(editor, test_file):
     """Test deleting with overlapping ranges."""
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Prepare hashes for the ranges
     lines = content.splitlines(keepends=True)
@@ -225,7 +225,7 @@ async def test_delete_with_overlapping_ranges(editor, test_file):
 @pytest.mark.asyncio
 async def test_delete_multiple_ranges(editor, test_file):
     """Test deleting multiple non-consecutive ranges."""
-    content, _, _, file_hash, _, _ = await editor.read_file_contents(str(test_file))
+    content, _, _, file_hash, _, _ = await editor.read_file(str(test_file))
 
     # Prepare hashes for the ranges
     lines = content.splitlines(keepends=True)
