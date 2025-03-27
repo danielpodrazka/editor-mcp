@@ -29,7 +29,8 @@ class TextEditorServer:
     This class provides a set of tools for interacting with text files, including:
     - Setting the current file to work with
     - Reading text content from files
-    - Editing file content through various modes (insert, overwrite, create)
+    - Editing file content through insert and overwrite modes
+    - Creating new files
     - Deleting files
 
     The server uses hashing to ensure file content integrity during editing operations.
@@ -92,9 +93,8 @@ class TextEditorServer:
                     lines = file.readlines()
                 if line_start is None and line_end is None:
                     numbered_lines = []
-                    max_line_num_width = len(str(len(lines)))
                     for i, line in enumerate(lines, start=1):
-                        numbered_lines.append(f"{i:{max_line_num_width}} | {line}")
+                        numbered_lines.append(f"{i}|{line}")
                     text = "".join(numbered_lines)
                     result["text"] = text
                     result["info"] = "No line_start/line_end provided so no hash"
@@ -142,11 +142,11 @@ class TextEditorServer:
             lines_hash: Optional[str] = None,
         ) -> Dict[str, Any]:
             """
-            Edit text in the current file in various modes.
+            Edit text in the current file using insert or overwrite modes.
 
             Args:
-                mode (str): Edit mode - 'insert', 'overwrite', or 'create'
-                text (str): Text to insert, overwrite, or create
+                mode (str): Edit mode - 'insert' or 'overwrite'
+                text (str): Text to insert or overwrite
                 line (int, optional): Line number for insert mode (1-based)
                 line_start (int, optional): Start line for overwrite mode (1-based)
                 line_end (int, optional): End line for overwrite mode (1-based)
@@ -162,40 +162,13 @@ class TextEditorServer:
                 - The behavior mimics copy-paste: original lines are removed, new lines are inserted at that position,
                   and any content after the original section is preserved and will follow the new content.
             """
-
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
 
-            if mode not in ["insert", "overwrite", "create"]:
+            if mode not in ["insert", "overwrite"]:
                 return {
-                    "error": f"Invalid mode: '{mode}'. Must be 'insert', 'overwrite', or 'create'."
+                    "error": f"Invalid mode: '{mode}'. Must be 'insert' or 'overwrite'."
                 }
-
-            if mode == "create":
-                if (
-                    os.path.exists(self.current_file_path)
-                    and os.path.getsize(self.current_file_path) > 0
-                ):
-                    return {
-                        "error": "Create mode requires a non-existent file or an empty file. "
-                        "Current file exists and is not empty."
-                    }
-
-                try:
-                    with open(self.current_file_path, "w", encoding="utf-8") as file:
-                        file.write(text)
-
-                    result = {
-                        "status": "success",
-                        "message": "File created successfully",
-                    }
-                    if len(text.splitlines()) <= self.max_edit_lines:
-                        result["lines_hash"] = calculate_hash(text)
-
-                    return result
-                except Exception as e:
-                    return {"error": f"Error creating file: {str(e)}"}
-
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
@@ -204,10 +177,14 @@ class TextEditorServer:
 
             if mode == "insert":
                 if line is None:
-                    return {"error": "Insert mode requires a line number."}
+                    return {
+                        "error": "Insert mode requires a line number and it's hash below which you want to insert."
+                    }
 
                 if lines_hash is None:
-                    return {"error": "Insert mode requires a lines_hash."}
+                    return {
+                        "error": "Insert mode requires a lines_hash of the line above the insert."
+                    }
 
                 if line < 1 or line > len(lines):
                     return {
@@ -324,6 +301,53 @@ class TextEditorServer:
                 }
             except Exception as e:
                 return {"error": f"Error deleting file: {str(e)}"}
+
+        @self.mcp.tool()
+        async def new_file(
+            absolute_file_path: str,
+            text: str,
+        ) -> Dict[str, Any]:
+            """
+            Create a new file with the provided content.
+
+            This tool should be used when you want to create a new file.
+            The file must not exist or be empty for this operation to succeed.
+
+            Args:
+                absolute_file_path (str): Path of the new file
+                text (str): Content to write to the new file
+
+            Returns:
+                dict: Operation result with status and hash of the content if applicable
+
+            Notes:
+                - This tool will fail if the current file exists and is not empty.
+                - Use set_file first to specify the file path.
+            """
+            self.current_file_path = absolute_file_path
+
+            if (
+                os.path.exists(self.current_file_path)
+                and os.path.getsize(self.current_file_path) > 0
+            ):
+                return {
+                    "error": "Cannot create new file. Current file exists and is not empty."
+                }
+
+            try:
+                with open(self.current_file_path, "w", encoding="utf-8") as file:
+                    file.write(text)
+
+                result = {
+                    "status": "success",
+                    "message": "File created successfully",
+                }
+                if len(text.splitlines()) <= self.max_edit_lines:
+                    result["lines_hash"] = calculate_hash(text)
+
+                return result
+            except Exception as e:
+                return {"error": f"Error creating file: {str(e)}"}
 
     def run(self):
         """Run the MCP server."""

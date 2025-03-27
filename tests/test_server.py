@@ -71,7 +71,7 @@ class TestTextEditorServer:
         """Test getting text when no file is set."""
         get_text_fn = self.get_tool_fn(server, "get_text")
 
-        result = await get_text_fn(include_line_numbers=False)
+        result = await get_text_fn()
 
         assert "error" in result
         assert "No file path is set" in result["error"]
@@ -84,14 +84,11 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(include_line_numbers=False)
+        result = await get_text_fn()
 
         assert "text" in result
-        assert "lines_hash" in result
-        assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == result["text"]
-
-        expected_hash = calculate_hash("Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n")
-        assert expected_hash == result["lines_hash"]
+        assert "1|Line 1\n2|Line 2\n3|Line 3\n4|Line 4\n5|Line 5\n" == result["text"]
+        assert "lines_hash" not in result
 
     @pytest.mark.asyncio
     async def test_get_text_line_range(self, server, temp_file):
@@ -101,11 +98,11 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 4, include_line_numbers=False)
+        result = await get_text_fn(2, 4)
 
         assert "text" in result
         assert "lines_hash" in result
-        assert "Line 2\nLine 3\nLine 4\n" == result["text"]
+        assert "2|Line 2\n3|Line 3\n4|Line 4\n" == result["text"]
 
         expected_hash = calculate_hash("Line 2\nLine 3\nLine 4\n", 2, 4)
         assert expected_hash == result["lines_hash"]
@@ -117,9 +114,9 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3, include_line_numbers=False)
+        result = await get_text_fn(3)
 
-        assert "Line 3\nLine 4\nLine 5\n" == result["text"]
+        assert "3|Line 3\n4|Line 4\n5|Line 5\n" == result["text"]
         expected_hash = calculate_hash("Line 3\nLine 4\nLine 5\n", 3, 5)
         assert expected_hash == result["lines_hash"]
 
@@ -130,9 +127,9 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(None, 2, include_line_numbers=False)
+        result = await get_text_fn(None, 2)
 
-        assert "Line 1\nLine 2\n" == result["text"]
+        assert "1|Line 1\n2|Line 2\n" == result["text"]
         expected_hash = calculate_hash("Line 1\nLine 2\n", 1, 2)
         assert expected_hash == result["lines_hash"]
 
@@ -144,11 +141,11 @@ class TestTextEditorServer:
 
         get_text_fn = self.get_tool_fn(server, "get_text")
 
-        result = await get_text_fn(4, 2, include_line_numbers=False)
+        result = await get_text_fn(4, 2)
         assert "error" in result
         assert "line_start cannot be greater than line_end" in result["error"]
 
-        result = await get_text_fn(0, 3, include_line_numbers=False)
+        result = await get_text_fn(0, 3)
         assert "error" in result
         assert "line_start must be at least 1" in result["error"]
 
@@ -159,24 +156,9 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3, 10, include_line_numbers=False)
+        result = await get_text_fn(3, 10)
 
-        assert "Line 3\nLine 4\nLine 5\n" == result["text"]
-        expected_hash = calculate_hash("Line 3\nLine 4\nLine 5\n", 3, 5)
-        assert expected_hash == result["lines_hash"]
-
-    @pytest.mark.asyncio
-    async def test_get_text_empty_file(self, server, empty_temp_file):
-        """Test getting text from an empty file."""
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(empty_temp_file)
-
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(include_line_numbers=False)
-
-        assert result["text"] == ""
-        expected_hash = calculate_hash("")
-        assert expected_hash == result["lines_hash"]
+        assert "3|Line 3\n4|Line 4\n5|Line 5\n" == result["text"]
 
     def test_calculate_hash_function(self):
         """Test the calculate_hash function directly."""
@@ -204,20 +186,20 @@ class TestTextEditorServer:
             await set_file_fn(large_file_path)
 
             get_text_fn = self.get_tool_fn(server, "get_text")
-            result = await get_text_fn(include_line_numbers=False)
+            result = await get_text_fn()
 
             assert "text" in result
             assert "lines_hash" not in result
-            assert f"range > self.max_edit_lines=50 so no hash." in result["info"]
+            assert f"No line_start/line_end provided so no hash" in result["info"]
             assert len(result["text"].splitlines()) == 60
 
-            result = await get_text_fn(5, 15, include_line_numbers=False)
+            result = await get_text_fn(5, 15)
 
             assert "text" in result
             assert "lines_hash" in result
             assert len(result["text"].splitlines()) == 11
 
-            result = await get_text_fn(5, 60, include_line_numbers=False)
+            result = await get_text_fn(5, 60)
 
             assert "text" in result
             assert "lines_hash" not in result
@@ -228,15 +210,15 @@ class TestTextEditorServer:
                 os.unlink(large_file_path)
 
     @pytest.mark.asyncio
-    async def test_edit_text_create_mode(self, server, empty_temp_file):
-        """Test edit_text in create mode."""
+    async def test_new_file(self, server, empty_temp_file):
+        """Test new_file functionality."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(empty_temp_file)
 
-        edit_text_fn = self.get_tool_fn(server, "edit_text")
+        new_file_fn = self.get_tool_fn(server, "new_file")
         content = "This is a test file.\nWith multiple lines.\nThree lines total."
-        result = await edit_text_fn("create", content)
+        result = await new_file_fn(empty_temp_file, content)
 
         assert result["status"] == "success"
         assert "lines_hash" in result
@@ -245,7 +227,7 @@ class TestTextEditorServer:
             file_content = file.read()
         assert file_content == content
 
-        result = await edit_text_fn("create", "This should fail.")
+        result = await new_file_fn(empty_temp_file, "This should fail.")
         assert "error" in result
 
     @pytest.mark.asyncio
@@ -256,7 +238,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 2, include_line_numbers=False)
+        result = await get_text_fn(2, 2)
         line_content = result["text"]
         line_hash = result["lines_hash"]
 
@@ -267,7 +249,7 @@ class TestTextEditorServer:
         assert result["status"] == "success"
         assert "new_line_hash" in result
 
-        result = await get_text_fn(include_line_numbers=False)
+        result = await get_text_fn()
         assert new_text in result["text"]
 
         lines = result["text"].splitlines()
@@ -289,7 +271,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 4, include_line_numbers=False)
+        result = await get_text_fn(2, 4)
         line_content = result["text"]
         lines_hash = result["lines_hash"]
 
@@ -301,7 +283,7 @@ class TestTextEditorServer:
 
         assert result["status"] == "success"
 
-        result = await get_text_fn(include_line_numbers=False)
+        result = await get_text_fn()
         lines = result["text"].splitlines()
 
         assert "Line 1" in lines[0]
@@ -365,16 +347,16 @@ class TestTextEditorServer:
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(empty_temp_file)
-
         edit_text_fn = self.get_tool_fn(server, "edit_text")
+        new_file_fn = self.get_tool_fn(server, "new_file")
         large_content = "\n".join([f"Line {i}" for i in range(1, 60)])
-        result = await edit_text_fn("create", large_content)
+        result = await new_file_fn(empty_temp_file, large_content)
 
         assert result["status"] == "success"
         assert "lines_hash" not in result
 
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3, 3, include_line_numbers=False)
+        result = await get_text_fn(3, 3)
         line_hash = result["lines_hash"]
 
         result = await edit_text_fn(
@@ -383,7 +365,7 @@ class TestTextEditorServer:
         assert result["status"] == "success"
         assert "new_line_hash" in result
 
-        result = await get_text_fn(10, 20, include_line_numbers=False)
+        result = await get_text_fn(10, 20)
         line_hash = result["lines_hash"]
 
         large_replacement = "\n".join([f"New line {i}" for i in range(1, 60)])
