@@ -25,7 +25,7 @@ def calculate_hash(text: str, line_start: int = None, line_end: int = None) -> s
 class TextEditorServer:
     def __init__(self):
         self.mcp = FastMCP("text-editor")
-        self.current_file_path = None  # Initialize with no file path set
+        self.current_file_path = None
 
         self.register_tools()
 
@@ -41,7 +41,7 @@ class TextEditorServer:
             Returns:
                 str: Confirmation message with the file path
             """
-            # Verify the file exists
+
             if not os.path.isfile(absolute_file_path):
                 return f"Error: File not found at '{absolute_file_path}'"
 
@@ -62,7 +62,7 @@ class TextEditorServer:
             Returns:
                 dict: Dictionary containing the text, and its hash if file has <= 50 lines
             """
-            # Check if a file is set
+
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
 
@@ -70,15 +70,12 @@ class TextEditorServer:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
 
-                # Handle line range specification
                 if line_start is not None or line_end is not None:
-                    # Set defaults if only one bound is specified
                     if line_start is None:
                         line_start = 1
                     if line_end is None:
                         line_end = len(lines)
 
-                    # Adjust for 1-based indexing
                     if line_start < 1:
                         return {"error": "line_start must be at least 1"}
 
@@ -88,11 +85,9 @@ class TextEditorServer:
                     if line_start > line_end:
                         return {"error": "line_start cannot be greater than line_end"}
 
-                    # Extract the specified lines (adjusting for 0-based indexing in Python)
                     selected_lines = lines[line_start - 1 : line_end]
                     text = "".join(selected_lines)
 
-                    # Only include lines_hash if the selection has 50 or fewer lines
                     result = {"text": text}
                     if len(selected_lines) <= 50:
                         result["lines_hash"] = calculate_hash(
@@ -101,11 +96,9 @@ class TextEditorServer:
 
                     return result
                 else:
-                    # Return the entire file
                     text = "".join(lines)
                     result = {"text": text}
 
-                    # Only include lines_hash if the file has 50 or fewer lines
                     if len(lines) <= 50:
                         result["lines_hash"] = calculate_hash(text)
                     else:
@@ -115,12 +108,174 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
 
+        @self.mcp.tool()
+        async def edit_text(
+            mode: str,
+            text: str,
+            line: Optional[int] = None,
+            line_start: Optional[int] = None,
+            line_end: Optional[int] = None,
+            lines_hash: Optional[str] = None,
+        ) -> Dict[str, Any]:
+            """
+            Edit text in the current file in various modes.
+
+            Args:
+                mode (str): Edit mode - 'insert', 'overwrite', or 'create'
+                text (str): Text to insert, overwrite, or create
+                line (int, optional): Line number for insert mode (1-based)
+                line_start (int, optional): Start line for overwrite mode (1-based)
+                line_end (int, optional): End line for overwrite mode (1-based)
+                lines_hash (str, optional): Hash of line(s) being modified (required for insert and overwrite)
+
+            Returns:
+                dict: Operation result with status and new hash if applicable
+            """
+
+            if self.current_file_path is None:
+                return {"error": "No file path is set. Use set_file first."}
+
+            if mode not in ["insert", "overwrite", "create"]:
+                return {
+                    "error": f"Invalid mode: '{mode}'. Must be 'insert', 'overwrite', or 'create'."
+                }
+
+            if mode == "create":
+                if (
+                    os.path.exists(self.current_file_path)
+                    and os.path.getsize(self.current_file_path) > 0
+                ):
+                    return {
+                        "error": "Create mode requires a non-existent file or an empty file. "
+                        "Current file exists and is not empty."
+                    }
+
+                try:
+                    with open(self.current_file_path, "w", encoding="utf-8") as file:
+                        file.write(text)
+
+                    result = {
+                        "status": "success",
+                        "message": "File created successfully",
+                    }
+                    if len(text.splitlines()) <= 50:
+                        result["lines_hash"] = calculate_hash(text)
+
+                    return result
+                except Exception as e:
+                    return {"error": f"Error creating file: {str(e)}"}
+
+            try:
+                with open(self.current_file_path, "r", encoding="utf-8") as file:
+                    lines = file.readlines()
+            except Exception as e:
+                return {"error": f"Error reading file: {str(e)}"}
+
+            if mode == "insert":
+                if line is None:
+                    return {"error": "Insert mode requires a line number."}
+
+                if lines_hash is None:
+                    return {"error": "Insert mode requires a lines_hash."}
+
+                if line < 1 or line > len(lines):
+                    return {
+                        "error": f"Invalid line number: {line}. File has {len(lines)} lines."
+                    }
+
+                line_content = lines[line - 1]
+                computed_hash = calculate_hash(line_content, line, line)
+
+                if computed_hash != lines_hash:
+                    return {
+                        "error": "Hash verification failed. The line may have been modified since you last read it."
+                    }
+
+                lines.insert(line, text if text.endswith("\n") else text + "\n")
+
+                try:
+                    with open(self.current_file_path, "w", encoding="utf-8") as file:
+                        file.writelines(lines)
+
+                    result = {
+                        "status": "success",
+                        "message": f"Text inserted after line {line}",
+                    }
+
+                    new_line_hash = calculate_hash(
+                        text if text.endswith("\n") else text + "\n", line + 1, line + 1
+                    )
+                    result["new_line_hash"] = new_line_hash
+
+                    return result
+                except Exception as e:
+                    return {"error": f"Error writing to file: {str(e)}"}
+
+            if mode == "overwrite":
+                if line_start is None or line_end is None:
+                    return {
+                        "error": "Overwrite mode requires both line_start and line_end."
+                    }
+
+                if lines_hash is None:
+                    return {"error": "Overwrite mode requires a lines_hash."}
+
+                if line_start < 1:
+                    return {"error": "line_start must be at least 1."}
+
+                if line_end > len(lines):
+                    return {
+                        "error": f"line_end ({line_end}) exceeds file length ({len(lines)})."
+                    }
+
+                if line_start > line_end:
+                    return {"error": "line_start cannot be greater than line_end."}
+
+                current_content = "".join(lines[line_start - 1 : line_end])
+
+                computed_hash = calculate_hash(current_content, line_start, line_end)
+
+                if computed_hash != lines_hash:
+                    return {
+                        "error": "Hash verification failed. The content may have been modified since you last read it."
+                    }
+
+                new_text = text
+                if not new_text.endswith("\n") and line_end < len(lines):
+                    new_text += "\n"
+
+                new_lines = new_text.splitlines(True)
+
+                before = lines[: line_start - 1]
+                after = lines[line_end:]
+                modified_lines = before + new_lines + after
+
+                try:
+                    with open(self.current_file_path, "w", encoding="utf-8") as file:
+                        file.writelines(modified_lines)
+
+                    result = {
+                        "status": "success",
+                        "message": f"Text overwritten from line {line_start} to {line_end}",
+                    }
+
+                    if len(new_lines) <= 50:
+                        new_content = "".join(new_lines)
+                        result["lines_hash"] = calculate_hash(
+                            new_content, line_start, line_start + len(new_lines) - 1
+                        )
+
+                    return result
+                except Exception as e:
+                    return {"error": f"Error writing to file: {str(e)}"}
+
+            return {"error": "Unknown error occurred."}
+
     def run(self):
         """Run the MCP server."""
         self.mcp.run(transport="stdio")
 
 
-# Create and run the server if this script is executed directly
 if __name__ == "__main__":
     server = TextEditorServer()
     server.run()
