@@ -49,9 +49,18 @@ Reads text from the current file.
 **Parameters**:
 - `line_start` (int, optional): Start line number (1-based indexing)
 - `line_end` (int, optional): End line number (1-based indexing)
+- `include_line_numbers` (bool, optional): If True, prefixes each line with its line number (default: False)
 
 **Returns**:
-- Dictionary containing the text and its hash if the file has fewer than MAX_EDIT_LINES lines
+- Dictionary containing the text (optionally with line numbers) and its hash if the file has fewer than MAX_EDIT_LINES lines
+
+**Example output with line numbers**:
+```
+1 | def hello():
+2 |     print("Hello, world!")
+3 | 
+4 | hello()
+```
 
 #### 3. `edit_text`
 Edits text in the current file using various modes.
