@@ -17,7 +17,6 @@ from mcp_text_editor.server import (
     create_file_handler,
     delete_contents_handler,
     get_contents_handler,
-    insert_file_handler,
     list_tools,
     main,
     patch_file_handler,
@@ -229,7 +228,6 @@ async def test_call_tool_all_handlers(mocker: MockerFixture):
         create_file_handler,
         append_file_handler,
         delete_contents_handler,
-        insert_file_handler,
         patch_file_handler,
     ]
 

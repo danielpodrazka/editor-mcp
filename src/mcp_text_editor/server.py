@@ -13,7 +13,6 @@ from .handlers import (
     CreateTextFileHandler,
     DeleteTextFileContentsHandler,
     GetTextFileContentsHandler,
-    InsertTextFileContentsHandler,
     PatchTextFileContentsHandler,
 )
 from .version import __version__
@@ -30,7 +29,6 @@ patch_file_handler = PatchTextFileContentsHandler()
 create_file_handler = CreateTextFileHandler()
 append_file_handler = AppendTextFileContentsHandler()
 delete_contents_handler = DeleteTextFileContentsHandler()
-insert_file_handler = InsertTextFileContentsHandler()
 
 
 @app.list_tools()
@@ -41,7 +39,6 @@ async def list_tools() -> List[Tool]:
         create_file_handler.get_tool_description(),
         append_file_handler.get_tool_description(),
         delete_contents_handler.get_tool_description(),
-        insert_file_handler.get_tool_description(),
         patch_file_handler.get_tool_description(),
     ]
 
@@ -59,8 +56,6 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
             return await append_file_handler.run_tool(arguments)
         elif name == delete_contents_handler.name:
             return await delete_contents_handler.run_tool(arguments)
-        elif name == insert_file_handler.name:
-            return await insert_file_handler.run_tool(arguments)
         elif name == patch_file_handler.name:
             return await patch_file_handler.run_tool(arguments)
         else:
