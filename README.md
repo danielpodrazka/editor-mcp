@@ -49,7 +49,7 @@ Reads text from the current file.
 **Parameters**:
 - `line_start` (int, optional): Start line number (1-based indexing)
 - `line_end` (int, optional): End line number (1-based indexing)
-- `include_line_numbers` (bool, optional): If True, prefixes each line with its line number (default: False)
+- `include_line_numbers` (bool, optional): If True, prefixes each line with its line number (default: True)
 
 **Returns**:
 - Dictionary containing the text (optionally with line numbers) and its hash if the file has fewer than MAX_EDIT_LINES lines
@@ -140,6 +140,23 @@ The test suite covers:
 ## How it Works
 
 The server uses FastMCP to expose text editing capabilities through a well-defined API. The hash verification system ensures data integrity by verifying that the content hasn't changed between reading and modifying operations.
+
+The hashing mechanism uses SHA-256 to generate a hash of the file content or selected line ranges. For line-specific operations, the hash includes a prefix indicating the line range (e.g., "L10-15-[hash]"). This helps ensure that edits are being applied to the expected content.
+
+## Implementation Details
+
+The main `TextEditorServer` class:
+
+1. Initializes with a FastMCP instance named "text-editor"
+2. Sets a configurable `max_edit_lines` limit (default: 50) from environment variables
+3. Maintains the current file path as state
+4. Registers four primary tools through FastMCP:
+   - `set_file`: Validates and sets the current file path
+   - `get_text`: Reads content with optional line numbering and hash generation
+   - `edit_text`: Provides three editing modes with hash verification
+   - `delete_current_file`: Removes files with proper cleanup
+
+The server runs using FastMCP's stdio transport by default, making it easy to integrate with various clients.
 
 ## Troubleshooting
 

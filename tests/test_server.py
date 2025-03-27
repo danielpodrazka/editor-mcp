@@ -300,7 +300,6 @@ class TestTextEditorServer:
         )
 
         assert result["status"] == "success"
-        assert "lines_hash" in result
 
         result = await get_text_fn(include_line_numbers=False)
         lines = result["text"].splitlines()

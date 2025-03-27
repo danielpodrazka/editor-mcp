@@ -43,7 +43,7 @@ class TextEditorServer:
 
     def __init__(self):
         self.mcp = FastMCP("text-editor")
-        self.max_edit_lines = os.getenv("MAX_EDIT_LINES", 50)
+        self.max_edit_lines = int(os.getenv("MAX_EDIT_LINES", "50"))
         self.current_file_path = None
 
         self.register_tools()
@@ -309,12 +309,6 @@ class TextEditorServer:
                         "status": "success",
                         "message": f"Text overwritten from line {line_start} to {line_end}",
                     }
-
-                    if len(new_lines) <= self.max_edit_lines:
-                        new_content = "".join(new_lines)
-                        result["lines_hash"] = calculate_hash(
-                            new_content, line_start, line_start + len(new_lines) - 1
-                        )
 
                     return result
                 except Exception as e:
