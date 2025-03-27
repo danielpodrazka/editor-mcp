@@ -84,6 +84,7 @@ class TextEditorServer:
             Returns:
                 dict: Dictionary containing the text (optionally with line numbers), and its hash if file has <= self.max_edit_lines lines
             """
+            result = {}
 
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -91,7 +92,8 @@ class TextEditorServer:
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
-
+                    if len(lines) <= self.max_edit_lines:
+                        result["info"] = f"range > {self.max_edit_lines=} so no hash."
                 if line_start is not None or line_end is not None:
                     if line_start is None:
                         line_start = 1
@@ -119,7 +121,7 @@ class TextEditorServer:
                     else:
                         text = "".join(selected_lines)
 
-                    result = {"text": text}
+                    result["text"] = text
                     if len(selected_lines) <= self.max_edit_lines:
                         # Use the original text without line numbers for hash calculation
                         original_text = "".join(selected_lines)
@@ -139,14 +141,12 @@ class TextEditorServer:
                     else:
                         text = "".join(lines)
 
-                    result = {"text": text}
+                    result["text"] = text
 
                     if len(lines) <= self.max_edit_lines:
                         # Calculate hash based on original content without line numbers
                         original_text = "".join(lines)
                         result["lines_hash"] = calculate_hash(original_text)
-                    else:
-                        result["info"] = f"range > {self.max_edit_lines=} so no hash."
 
                     return result
             except Exception as e:
