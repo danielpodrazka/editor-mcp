@@ -7,13 +7,20 @@ from mcp.server.fastmcp import FastMCP
 
 def calculate_id(text: str, start: int = None, end: int = None) -> str:
     """
-    Args:
-        text (str): Content to id
-        start (Optional[int]): Starting line number
-        end (Optional[int]): Ending line number
+    Calculate a unique ID for content verification based on the text content.
 
+    The ID is formed by combining a line prefix (if line numbers are provided)
+    with a truncated SHA-256 hash of the content. This allows quick verification
+    that content hasn't changed between operations.
+
+    Args:
+        text (str): Content to generate ID for
+        start (Optional[int]): Starting line number for the content
+        end (Optional[int]): Ending line number for the content
     Returns:
-        str: Hex digest of SHA-256 id
+        str: ID string in format: [LinePrefix]-[TruncatedHash]
+             Example: "L10-15-a7" for content spanning lines 10-15
+             Example: "L5-b3" for content on line 5 only
     """
     prefix = ""
     if start and end:
@@ -57,6 +64,12 @@ class TextEditorServer:
             """
             Set the current file to work with.
 
+            This is always the first step in the workflow. You must set a file
+            before you can use other tools like read, insert, remove, etc.
+
+            Example:
+                set_file("/path/to/myfile.txt")
+
             Args:
                 absolute_file_path (str): Absolute path to the file
 
@@ -71,16 +84,40 @@ class TextEditorServer:
             return f"File set to: '{absolute_file_path}'"
 
         @self.mcp.tool()
-        async def read(
-            start: Optional[int] = None,
-            end: Optional[int] = None,
-        ) -> Dict[str, Any]:
+        async def skim() -> Dict[str, Any]:
             """
-            Read text from the current file. Use to get id for the editing.
+            Read full text from the current file. Good step after set_file.
+            """
+            if self.current_file_path is None:
+                return {"error": "No file path is set. Use set_file first."}
+            with open(self.current_file_path, "r", encoding="utf-8") as file:
+                lines = file.readlines()
+                text = "".join(lines)
+            return {"text": text}
+
+        @self.mcp.tool()
+        async def read(start: int, end: int) -> Dict[str, Any]:
+            """
+            Read text from the current file and get its ID for editing operations.
+
+            This is a key step before any editing operation. The returned ID is
+            required for insert and remove operations to ensure content integrity.
+
+            Workflow:
+            1. Call skim() to get the context of the whole file
+            1. Call read(20,30) to get content of the range you want to edit (here lines 20 to 30) and its ID
+            2. Use the ID in subsequent remove operations
+
+            Example:
+                # Read specific lines
+                result = read(start=5, end=10)
+                content = result["text"]
+                content_id = result["id"]
+                remove_lines(5,10,content_id)  # Use this ID for removing lines from 5 to 10
 
             Args:
-                start (int, optional): Start line number (1-based indexing). If omitted but end is provided, starts at line 1.
-                end (int, optional): End line number (1-based indexing). If omitted but start is provided, goes to the end of the file.
+                start (int, optional): Start line number (1-based indexing).
+                end (int, optional): End line number (1-based indexing).
 
             Returns:
                 dict: Dictionary containing the text with each line, and lines range id if file has <= self.max_edit_lines lines
@@ -94,10 +131,6 @@ class TextEditorServer:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
 
-                if start is None:
-                    start = 1
-                if end is None:
-                    end = len(lines)
                 if start < 1:
                     return {"error": "start must be at least 1"}
                 if end > len(lines):
@@ -129,12 +162,35 @@ class TextEditorServer:
         ) -> Dict[str, Any]:
             """
             Insert lines of text after a specific line in the current file.
-            Please don't insert more than 50 lines at a time to prevent hitting limits.
+
+            This method performs content integrity verification using the provided ID
+            before inserting the new content, ensuring the content hasn't changed since
+            you last read it.
+
+            Workflow:
+            1. Use read(40,50) or find_line() to get the line's ID
+            2. Call insert() with the line number, ID and your new content
+
+            Example:
+                # First get ID for the line (must call read first)
+                result = read(5,5)
+                line_id = result["id"]
+
+                # Insert text after line 5
+                insert(id=line_id, line=5, text="New content here")
+
+                # Use find_line to get a specific line's ID
+                matches = find_line("function main")
+                if matches["total_matches"] > 0:
+                    line_id = matches["matches"][0]["id"]
+                    line_num = matches["matches"][0]["line_number"]
+                    insert(id=line_id, line=line_num, text="// New comment")
 
             Args:
-                id (str): id of the line at the specified line number
+                id (str): ID of the line at the specified line number
+                          (obtain this from read or find_line)
                 line (int): Line number (1-based) after which to insert text
-                text (str): Text to insert.
+                text (str): Text to insert
 
             Returns:
                 dict: Operation result with status
