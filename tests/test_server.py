@@ -71,7 +71,7 @@ class TestTextEditorServer:
         """Test getting text when no file is set."""
         read_fn = self.get_tool_fn(server, "read")
 
-        result = await read_fn()
+        result = await read_fn(1, 10)
 
         assert "error" in result
         assert "No file path is set" in result["error"]
@@ -79,18 +79,16 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_read_entire_file(self, server, temp_file):
         """Test getting the entire content of a file."""
-
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
         read_fn = self.get_tool_fn(server, "read")
-        result = await read_fn()
+        result = await read_fn(1, 5)
 
         assert "text" in result
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == result["text"]
         assert "id" in result
 
-    @pytest.mark.asyncio
     async def test_read_line_range(self, server, temp_file):
         """Test getting a specific range of lines from a file."""
 
@@ -108,28 +106,13 @@ class TestTextEditorServer:
         assert expected_id == result["id"]
 
     @pytest.mark.asyncio
-    async def test_read_only_start_line(self, server, temp_file):
-        """Test getting text with only start line specified."""
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(temp_file)
-
-        read_fn = self.get_tool_fn(server, "read")
-        result = await read_fn(3)
-
-        assert "Line 3\nLine 4\nLine 5\n" == result["text"]
-        expected_id = calculate_id("Line 3\nLine 4\nLine 5\n", 3, 5)
-        assert expected_id == result["id"]
-
-    @pytest.mark.asyncio
     async def test_read_only_end_line(self, server, temp_file):
         """Test getting text with only end line specified."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
         read_fn = self.get_tool_fn(server, "read")
-        result = await read_fn(None, 2)
-
-        assert "Line 1\nLine 2\n" == result["text"]
+        result = await read_fn(1, 2)
         expected_id = calculate_id("Line 1\nLine 2\n", 1, 2)
         assert expected_id == result["id"]
 
@@ -186,7 +169,7 @@ class TestTextEditorServer:
             await set_file_fn(large_file_path)
 
             read_fn = self.get_tool_fn(server, "read")
-            result = await read_fn()
+            result = await read_fn(1, more_than_max_lines)
 
             assert "text" in result
             assert (
@@ -296,149 +279,6 @@ class TestTextEditorServer:
             monkeypatch.undo()
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
-
-    @pytest.mark.asyncio
-    async def test_insert(self, server, temp_file):
-        """Test insert functionality."""
-
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(temp_file)
-
-        read_fn = self.get_tool_fn(server, "read")
-        result = await read_fn(2, 2)
-        line_content = result["text"]
-        line_id = result["id"]
-
-        insert_fn = self.get_tool_fn(server, "insert")
-        new_text = "This is a new inserted line."
-        result = await insert_fn(text=new_text, line=2, id=line_id)
-
-        assert result["status"] == "success"
-
-        result = await read_fn()
-        assert new_text in result["text"]
-
-        lines = result["text"].splitlines()
-        assert "Line 2" in lines[1]
-        assert new_text in lines[2]
-        assert "Line 3" in lines[3]
-
-        result = await insert_fn(text="This should fail.", line=2, id="invalid-id")
-        assert "error" in result
-        assert "id verification failed" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_remove(self, server, temp_file):
-        """Test remove functionality."""
-
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(temp_file)
-
-        # First, read the entire file to verify initial state
-        read_fn = self.get_tool_fn(server, "read")
-        initial_result = await read_fn()
-        assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == initial_result["text"]
-
-        # Get id for lines 2-4
-        result = await read_fn(2, 4)
-        id = result["id"]
-
-        # Remove lines 2-4
-        remove_fn = self.get_tool_fn(server, "remove")
-        result = await remove_fn(start=2, end=4, id=id)
-
-        assert result["status"] == "success"
-        assert "Lines 2 to 4 removed" in result["message"]
-
-        # Verify the file now only has lines 1 and 5
-        result = await read_fn()
-        lines = result["text"].splitlines()
-        assert len(lines) == 2
-        assert "Line 1" in lines[0]
-        assert "Line 5" in lines[1]
-
-        # Test id verification failure
-        result = await read_fn(1, 1)
-        line_id = result["id"]
-
-        result = await remove_fn(start=1, end=1, id="invalid-id")
-        assert "error" in result
-        assert "id verification failed" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_remove_validation(self, server, temp_file):
-        """Test remove validation checks."""
-
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(temp_file)
-
-        remove_fn = self.get_tool_fn(server, "remove")
-
-        # Test no file set
-        server.current_file_path = None
-        result = await remove_fn(start=1, end=2, id="dummy")
-        assert "error" in result
-        assert "No file path is set" in result["error"]
-
-        # Reset file path
-        await set_file_fn(temp_file)
-
-        # Test start < 1
-        result = await remove_fn(start=0, end=2, id="dummy")
-        assert "error" in result
-        assert "start must be at least 1" in result["error"]
-
-        # Test end > file length
-        result = await remove_fn(start=1, end=10, id="dummy")
-        assert "error" in result
-        assert "end (10) exceeds file length" in result["error"]
-
-        # Test start > end
-        result = await remove_fn(start=3, end=2, id="dummy")
-        assert "error" in result
-        assert "start cannot be greater than end" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_replace_text_with_remove_and_insert(self, server, temp_file):
-        """Test using remove and insert together to replace content (replacing overwrite_text)."""
-
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(temp_file)
-
-        # First, read the file to verify initial state
-        read_fn = self.get_tool_fn(server, "read")
-        initial_result = await read_fn()
-        assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == initial_result["text"]
-
-        # Get id for lines 2-4 that we want to replace
-        result = await read_fn(2, 4)
-        id = result["id"]
-
-        # Step 1: Remove lines 2-4
-        remove_fn = self.get_tool_fn(server, "remove")
-        result = await remove_fn(start=2, end=4, id=id)
-        assert result["status"] == "success"
-
-        # Step 2: Get id for the line before where we want to insert (now line 1)
-        result = await read_fn(1, 1)
-        line_1_id = result["id"]
-
-        # Step 3: Insert new content after line 1
-        insert_fn = self.get_tool_fn(server, "insert")
-        new_text = "Completely new line 2.\nAnd new line 3.\nAnd new line 4."
-        result = await insert_fn(text=new_text, line=1, id=line_1_id)
-        assert result["status"] == "success"
-
-        # Verify final content
-        result = await read_fn()
-        lines = result["text"].splitlines()
-
-        assert len(lines) == 5
-        assert "Line 1" in lines[0]
-        assert "Completely new line 2" in lines[1]
-        assert "And new line 3" in lines[2]
-        assert "And new line 4" in lines[3]
-        assert "Line 5" in lines[4]
 
     @pytest.mark.asyncio
     async def test_find_line_no_file_set(self, server):

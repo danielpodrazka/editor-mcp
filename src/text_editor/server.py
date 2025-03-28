@@ -10,7 +10,7 @@ def calculate_id(text: str, start: int = None, end: int = None) -> str:
     Calculate a unique ID for content verification based on the text content.
 
     The ID is formed by combining a line prefix (if line numbers are provided)
-    with a truncated SHA-256 hash of the content. This allows quick verification
+    with a truncated SHA-256 id of the content. This allows quick verification
     that content hasn't changed between operations.
 
     Args:
@@ -18,7 +18,7 @@ def calculate_id(text: str, start: int = None, end: int = None) -> str:
         start (Optional[int]): Starting line number for the content
         end (Optional[int]): Ending line number for the content
     Returns:
-        str: ID string in format: [LinePrefix]-[TruncatedHash]
+        str: ID string in format: [LinePrefix]-[Truncatedid]
              Example: "L10-15-a7" for content spanning lines 10-15
              Example: "L5-b3" for content on line 5 only
     """
@@ -148,75 +148,17 @@ class TextEditorServer:
                 return {"error": f"Error reading file: {str(e)}"}
 
         @self.mcp.tool()
-        async def insert(
-            id_above: str,
-            line_above: int,
+        async def overwrite(
             text: str,
-        ) -> Dict[str, Any]:
-            """
-            Insert lines of text after a specific line in the current file.
-
-            Args:
-                id_above (str): ID of the line at the specified line number
-                          (obtain this from read or find_line)
-                line_above (int): Line number (1-based). Text will be inserted below this line.
-                text (str): Text to insert
-
-            Returns:
-                dict: Operation result with status
-
-            Notes:
-                - This tool is the preferred way to add new content into a file
-                - The id verification ensures the file hasn't changed since you last read it
-                - The text will be inserted immediately after the specified line
-                - Use together with remove_lines to replace content
-            """
-            if self.current_file_path is None:
-                return {"error": "No file path is set. Use set_file first."}
-
-            try:
-                with open(self.current_file_path, "r", encoding="utf-8") as file:
-                    lines = file.readlines()
-            except Exception as e:
-                return {"error": f"Error reading file: {str(e)}"}
-
-            if line_above < 1 or line_above > len(lines):
-                return {
-                    "error": f"Invalid line number: {line_above}. File has {len(lines)} lines."
-                }
-
-            line_content = lines[line_above - 1]
-            computed_id = calculate_id(line_content, line_above, line_above)
-
-            if computed_id != id_above:
-                return {
-                    "error": "id verification failed. The line may have been modified since you last read it."
-                }
-
-            lines.insert(line_above, text if text.endswith("\n") else text + "\n")
-
-            try:
-                with open(self.current_file_path, "w", encoding="utf-8") as file:
-                    file.writelines(lines)
-
-                result = {
-                    "status": "success",
-                    "message": f"Text inserted after line {line_above}",
-                }
-                return result
-            except Exception as e:
-                return {"error": f"Error writing to file: {str(e)}"}
-
-        @self.mcp.tool()
-        async def remove(
-            id: str,
             start: int,
             end: int,
+            id: str,
         ) -> Dict[str, Any]:
             """
-            Remove a range of lines from the current file.
+            Overwrite a range of lines in the current file with new text.
 
             Args:
+                text (str): New text to replace the specified range
                 start (int): Start line number (1-based)
                 end (int): End line number (1-based)
                 id (str): id of the lines in the specified range
@@ -225,8 +167,12 @@ class TextEditorServer:
                 dict: Operation result with status and message
 
             Notes:
-                - The id verification ensures the file content hasn't changed since you last read it
-                - Use together with insert to replace content
+                - This tool allows replacing a range of lines with new content
+                - The number of new lines can differ from the original range
+                - To remove lines, provide an empty string as the text parameter
+                - The behavior mimics copy-paste: original lines are removed, new lines are
+                  inserted at that position, and any content after the original section
+                  is preserved and will follow the new content
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -238,15 +184,23 @@ class TextEditorServer:
                 return {"error": f"Error reading file: {str(e)}"}
 
             if start < 1:
-                return {"error": "start must be at least 1."}
+                return {"error": "line_start must be at least 1."}
 
             if end > len(lines):
-                return {"error": f"end ({end}) exceeds file length ({len(lines)})."}
+                return {
+                    "error": f"line_end ({end}) exceeds file length ({len(lines)})."
+                }
 
             if start > end:
-                return {"error": "start cannot be greater than end."}
+                return {"error": "line_start cannot be greater than line_end."}
+
+            if end - start + 1 > self.max_edit_lines:
+                return {
+                    "error": f"Cannot overwrite more than {self.max_edit_lines} lines at once (attempted {end - start + 1} lines)."
+                }
 
             current_content = "".join(lines[start - 1 : end])
+
             computed_id = calculate_id(current_content, start, end)
 
             if computed_id != id:
@@ -254,9 +208,15 @@ class TextEditorServer:
                     "error": "id verification failed. The content may have been modified since you last read it."
                 }
 
+            new_text = text
+            if not new_text.endswith("\n") and end < len(lines):
+                new_text += "\n"
+
+            new_lines = new_text.splitlines(True)
+
             before = lines[: start - 1]
             after = lines[end:]
-            modified_lines = before + after
+            modified_lines = before + new_lines + after
 
             try:
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
@@ -264,7 +224,7 @@ class TextEditorServer:
 
                 result = {
                     "status": "success",
-                    "message": f"Lines {start} to {end} removed",
+                    "message": f"Text overwritten from line {start} to {end}",
                 }
 
                 return result
@@ -352,7 +312,7 @@ class TextEditorServer:
             search_text: str,
         ) -> Dict[str, Any]:
             """
-            Find lines that match provided text in the current file. Can be used to get the ID before calling insert
+            Find lines that match provided text in the current file.
 
             Args:
                 search_text (str): Text to search for in the file
