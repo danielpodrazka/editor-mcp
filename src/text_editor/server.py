@@ -325,6 +325,47 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error creating file: {str(e)}"}
 
+        @self.mcp.tool()
+        async def find_line(
+            search_text: str,
+        ) -> Dict[str, Any]:
+            """
+            Find lines that match provided text in the current file.
+            
+            Args:
+                search_text (str): Text to search for in the file
+                
+            Returns:
+                dict: Dictionary containing matching lines with their line numbers, lines_hash, and full text
+            """
+            if self.current_file_path is None:
+                return {"error": "No file path is set. Use set_file first."}
+                
+            try:
+                with open(self.current_file_path, "r", encoding="utf-8") as file:
+                    lines = file.readlines()
+                
+                matches = []
+                for i, line in enumerate(lines, start=1):
+                    if search_text in line:
+                        line_hash = calculate_hash(line, i, i)
+                        matches.append({
+                            "line_number": i,
+                            "lines_hash": line_hash,
+                            "text": line
+                        })
+                
+                result = {
+                    "status": "success",
+                    "matches": matches,
+                    "total_matches": len(matches)
+                }
+                
+                return result
+                
+            except Exception as e:
+                return {"error": f"Error searching file: {str(e)}"}
+
     def run(self):
         """Run the MCP server."""
         self.mcp.run(transport="stdio")

@@ -443,3 +443,92 @@ class TestTextEditorServer:
         assert "And new line 3" in lines[2]
         assert "And new line 4" in lines[3]
         assert "Line 5" in lines[4]
+
+    @pytest.mark.asyncio
+    async def test_find_line_no_file_set(self, server):
+        """Test find_line with no file set."""
+        find_line_fn = self.get_tool_fn(server, "find_line")
+        
+        result = await find_line_fn(search_text="Line")
+        
+        assert "error" in result
+        assert "No file path is set" in result["error"]
+    
+    @pytest.mark.asyncio
+    async def test_find_line_basic(self, server, temp_file):
+        """Test basic find_line functionality."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+        
+        find_line_fn = self.get_tool_fn(server, "find_line")
+        
+        # Search for a common term that should be in all lines
+        result = await find_line_fn(search_text="Line")
+        
+        assert "status" in result
+        assert result["status"] == "success"
+        assert "matches" in result
+        assert "total_matches" in result
+        assert result["total_matches"] == 5
+        
+        # Verify structure of the matches
+        for match in result["matches"]:
+            assert "line_number" in match
+            assert "lines_hash" in match
+            assert "text" in match
+            assert f"Line {match['line_number']}" in match["text"]
+            
+        # Verify the line numbers are sequential
+        line_numbers = [match["line_number"] for match in result["matches"]]
+        assert line_numbers == [1, 2, 3, 4, 5]
+    
+    @pytest.mark.asyncio
+    async def test_find_line_specific_match(self, server, temp_file):
+        """Test find_line with a specific search term."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+        
+        find_line_fn = self.get_tool_fn(server, "find_line")
+        
+        # Search for a term that should only be in one line
+        result = await find_line_fn(search_text="Line 3")
+        
+        assert result["status"] == "success"
+        assert result["total_matches"] == 1
+        assert len(result["matches"]) == 1
+        assert result["matches"][0]["line_number"] == 3
+        assert "Line 3" in result["matches"][0]["text"]
+    
+    @pytest.mark.asyncio
+    async def test_find_line_no_matches(self, server, temp_file):
+        """Test find_line with a search term that doesn't exist."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+        
+        find_line_fn = self.get_tool_fn(server, "find_line")
+        
+        # Search for a non-existent term
+        result = await find_line_fn(search_text="NonExistentTerm")
+        
+        assert result["status"] == "success"
+        assert result["total_matches"] == 0
+        assert len(result["matches"]) == 0
+    
+    @pytest.mark.asyncio
+    async def test_find_line_file_read_error(self, server, temp_file, monkeypatch):
+        """Test find_line with a file read error."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+        
+        # Mock open to raise an exception
+        def mock_open(*args, **kwargs):
+            raise IOError("Mock file read error")
+            
+        monkeypatch.setattr("builtins.open", mock_open)
+        
+        find_line_fn = self.get_tool_fn(server, "find_line")
+        result = await find_line_fn(search_text="Line")
+        
+        assert "error" in result
+        assert "Error searching file" in result["error"]
+        assert "Mock file read error" in result["error"]
