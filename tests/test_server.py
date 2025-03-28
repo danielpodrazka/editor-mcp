@@ -368,3 +368,270 @@ class TestTextEditorServer:
         assert "error" in result
         assert "Error searching file" in result["error"]
         assert "Mock file read error" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_no_file_set(self, server):
+        """Test overwrite when no file is set."""
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+
+        result = await overwrite_fn(text="New content", start=1, end=2, id="some-id")
+
+        assert "error" in result
+        assert "No file path is set" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_basic(self, server, temp_file):
+        """Test basic overwrite functionality."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        # First read the content to get the ID
+        read_fn = self.get_tool_fn(server, "read")
+        read_result = await read_fn(2, 4)
+
+        # Now overwrite lines 2-4
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        new_content = "New Line 2\nNew Line 3\nNew Line 4\n"
+        result = await overwrite_fn(
+            text=new_content, start=2, end=4, id=read_result["id"]
+        )
+
+        assert "status" in result
+        assert result["status"] == "success"
+        assert "Text overwritten from line 2 to 4" in result["message"]
+
+        # Verify the file was actually modified
+        with open(temp_file, "r") as f:
+            file_content = f.read()
+
+        expected_content = "Line 1\nNew Line 2\nNew Line 3\nNew Line 4\nLine 5\n"
+        assert file_content == expected_content
+
+    @pytest.mark.asyncio
+    async def test_overwrite_invalid_range(self, server, temp_file):
+        """Test overwrite with invalid line ranges."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+
+        # Test with start < 1
+        result = await overwrite_fn(text="New content", start=0, end=2, id="some-id")
+        assert "error" in result
+        assert "line_start must be at least 1" in result["error"]
+
+        # Test with end > file length
+        result = await overwrite_fn(text="New content", start=1, end=10, id="some-id")
+        assert "error" in result
+        assert "line_end (10) exceeds file length" in result["error"]
+
+        # Test with start > end
+        result = await overwrite_fn(text="New content", start=4, end=2, id="some-id")
+        assert "error" in result
+        assert "line_start cannot be greater than line_end" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_id_verification_failed(self, server, temp_file):
+        """Test overwrite with incorrect ID (content verification failure)."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+
+        # Use an incorrect ID
+        result = await overwrite_fn(
+            text="New content", start=2, end=3, id="incorrect-id"
+        )
+
+        assert "error" in result
+        assert "id verification failed" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_different_line_count(self, server, temp_file):
+        """Test overwrite with different line count (more or fewer lines)."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        # First read the content to get the ID
+        read_fn = self.get_tool_fn(server, "read")
+        read_result = await read_fn(2, 3)
+
+        # Replace 2 lines with 3 lines
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        new_content = "New Line 2\nExtra Line\nNew Line 3\n"
+        result = await overwrite_fn(
+            text=new_content, start=2, end=3, id=read_result["id"]
+        )
+
+        assert result["status"] == "success"
+
+        # Verify the file content
+        with open(temp_file, "r") as f:
+            file_content = f.read()
+
+        expected_content = (
+            "Line 1\nNew Line 2\nExtra Line\nNew Line 3\nLine 4\nLine 5\n"
+        )
+        assert file_content == expected_content
+
+        # Now read again for new ID
+        read_result = await read_fn(1, 6)
+
+        # Replace 6 lines with 1 line
+        new_content = "Single Line\n"
+        result = await overwrite_fn(
+            text=new_content, start=1, end=6, id=read_result["id"]
+        )
+
+        assert result["status"] == "success"
+
+        # Verify the file content
+        with open(temp_file, "r") as f:
+            file_content = f.read()
+
+        assert file_content == "Single Line\n"
+
+    @pytest.mark.asyncio
+    async def test_overwrite_empty_text(self, server, temp_file):
+        """Test overwrite with empty text (effectively removing lines)."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        # First read the content to get the ID
+        read_fn = self.get_tool_fn(server, "read")
+        read_result = await read_fn(2, 3)
+
+        # Replace with empty string (remove lines 2-3)
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        result = await overwrite_fn(text="", start=2, end=3, id=read_result["id"])
+
+        assert result["status"] == "success"
+
+        # Verify the file content
+        with open(temp_file, "r") as f:
+            file_content = f.read()
+
+        expected_content = "Line 1\nLine 4\nLine 5\n"
+        assert file_content == expected_content
+
+    @pytest.mark.asyncio
+    async def test_overwrite_max_lines_exceeded(self, server, temp_file):
+        """Test overwrite with a range exceeding max_edit_lines."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        # Create a temporary file with more than max_edit_lines
+        more_than_max_lines = server.max_edit_lines + 10
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
+            for i in range(more_than_max_lines):
+                f.write(f"Line {i + 1}\n")
+            large_file_path = f.name
+
+        try:
+            await set_file_fn(large_file_path)
+
+            overwrite_fn = self.get_tool_fn(server, "overwrite")
+            result = await overwrite_fn(
+                text="New content", start=1, end=server.max_edit_lines + 1, id="some-id"
+            )
+
+            assert "error" in result
+            assert (
+                f"Cannot overwrite more than {server.max_edit_lines} lines at once"
+                in result["error"]
+            )
+
+        finally:
+            if os.path.exists(large_file_path):
+                os.unlink(large_file_path)
+
+    @pytest.mark.asyncio
+    async def test_overwrite_file_read_error(self, server, temp_file, monkeypatch):
+        """Test overwrite with file read error."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        # Mock open to raise an exception during read
+        original_open = open
+
+        def mock_open_read(*args, **kwargs):
+            if args[1] == "r":
+                raise IOError("Mock file read error")
+            return original_open(*args, **kwargs)
+
+        monkeypatch.setattr("builtins.open", mock_open_read)
+
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        result = await overwrite_fn(text="New content", start=1, end=3, id="some-id")
+
+        assert "error" in result
+        assert "Error reading file" in result["error"]
+        assert "Mock file read error" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_file_write_error(self, server, temp_file, monkeypatch):
+        """Test overwrite with file write error."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        # First read the content to get the ID
+        read_fn = self.get_tool_fn(server, "read")
+        read_result = await read_fn(2, 3)
+
+        # Mock open for writing to raise an exception
+        original_open = open
+        open_calls = [0]
+
+        def mock_open_write(*args, **kwargs):
+            if args[1] == "w":
+                raise IOError("Mock file write error")
+            return original_open(*args, **kwargs)
+
+        monkeypatch.setattr("builtins.open", mock_open_write)
+
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        result = await overwrite_fn(
+            text="New content", start=2, end=3, id=read_result["id"]
+        )
+
+        assert "error" in result
+        assert "Error writing to file" in result["error"]
+        assert "Mock file write error" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_newline_handling(self, server):
+        """Test newline handling in overwrite (appends newline when needed)."""
+        # Create a file with text that doesn't end with a newline
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
+            f.write("Line 1\nLine 2\nLine 3")  # No trailing newline
+            temp_path = f.name
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(temp_path)
+
+            # First read the content to get the ID
+            read_fn = self.get_tool_fn(server, "read")
+            read_result = await read_fn(2, 2)
+
+            # Replace line 2
+            overwrite_fn = self.get_tool_fn(server, "overwrite")
+            result = await overwrite_fn(
+                text="New Line 2",  # No trailing newline
+                start=2,
+                end=2,
+                id=read_result["id"],
+            )
+
+            assert result["status"] == "success"
+
+            # Verify the file content, should add newline
+            with open(temp_path, "r") as f:
+                file_content = f.read()
+
+            expected_content = "Line 1\nNew Line 2\nLine 3"
+            assert file_content == expected_content
+
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)

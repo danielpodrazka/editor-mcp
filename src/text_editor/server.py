@@ -209,7 +209,7 @@ class TextEditorServer:
                 }
 
             new_text = text
-            if not new_text.endswith("\n") and end < len(lines):
+            if new_text != "" and not new_text.endswith("\n") and end < len(lines):
                 new_text += "\n"
 
             new_lines = new_text.splitlines(True)
