@@ -298,8 +298,8 @@ class TestTextEditorServer:
                 os.unlink(temp_path)
 
     @pytest.mark.asyncio
-    async def test_insert_lines(self, server, temp_file):
-        """Test insert_lines functionality."""
+    async def test_insert(self, server, temp_file):
+        """Test insert functionality."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
@@ -309,9 +309,9 @@ class TestTextEditorServer:
         line_content = result["text"]
         line_id = result["id"]
 
-        insert_lines_fn = self.get_tool_fn(server, "insert_lines")
+        insert_fn = self.get_tool_fn(server, "insert")
         new_text = "This is a new inserted line."
-        result = await insert_lines_fn(text=new_text, line=2, id=line_id)
+        result = await insert_fn(text=new_text, line=2, id=line_id)
 
         assert result["status"] == "success"
 
@@ -323,9 +323,7 @@ class TestTextEditorServer:
         assert new_text in lines[2]
         assert "Line 3" in lines[3]
 
-        result = await insert_lines_fn(
-            text="This should fail.", line=2, id="invalid-id"
-        )
+        result = await insert_fn(text="This should fail.", line=2, id="invalid-id")
         assert "error" in result
         assert "id verification failed" in result["error"]
 
@@ -402,7 +400,7 @@ class TestTextEditorServer:
 
     @pytest.mark.asyncio
     async def test_replace_text_with_remove_and_insert(self, server, temp_file):
-        """Test using remove_lines and insert_lines together to replace content (replacing overwrite_text)."""
+        """Test using remove_lines and insert together to replace content (replacing overwrite_text)."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
@@ -426,9 +424,9 @@ class TestTextEditorServer:
         line_1_id = result["id"]
 
         # Step 3: Insert new content after line 1
-        insert_lines_fn = self.get_tool_fn(server, "insert_lines")
+        insert_fn = self.get_tool_fn(server, "insert")
         new_text = "Completely new line 2.\nAnd new line 3.\nAnd new line 4."
-        result = await insert_lines_fn(text=new_text, line=1, id=line_1_id)
+        result = await insert_fn(text=new_text, line=1, id=line_1_id)
         assert result["status"] == "success"
 
         # Verify final content

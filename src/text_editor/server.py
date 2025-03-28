@@ -122,7 +122,7 @@ class TextEditorServer:
                 return {"error": f"Error reading file: {str(e)}"}
 
         @self.mcp.tool()
-        async def insert_lines(
+        async def insert(
             id: str,
             line: int,
             text: str,
@@ -215,9 +215,7 @@ class TextEditorServer:
                 return {"error": "start must be at least 1."}
 
             if end > len(lines):
-                return {
-                    "error": f"end ({end}) exceeds file length ({len(lines)})."
-                }
+                return {"error": f"end ({end}) exceeds file length ({len(lines)})."}
 
             if start > end:
                 return {"error": "start cannot be greater than end."}
