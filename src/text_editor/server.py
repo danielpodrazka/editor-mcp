@@ -108,13 +108,6 @@ class TextEditorServer:
             1. Call read(20,30) to get content of the range you want to edit (here lines 20 to 30) and its ID
             2. Use the ID in subsequent remove operations
 
-            Example:
-                # Read specific lines
-                result = read(start=5, end=10)
-                content = result["text"]
-                content_id = result["id"]
-                remove_lines(5,10,content_id)  # Use this ID for removing lines from 5 to 10
-
             Args:
                 start (int, optional): Start line number (1-based indexing).
                 end (int, optional): End line number (1-based indexing).
@@ -156,40 +149,17 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def insert(
-            id: str,
-            line: int,
+            id_above: str,
+            line_above: int,
             text: str,
         ) -> Dict[str, Any]:
             """
             Insert lines of text after a specific line in the current file.
 
-            This method performs content integrity verification using the provided ID
-            before inserting the new content, ensuring the content hasn't changed since
-            you last read it.
-
-            Workflow:
-            1. Use read(40,50) or find_line() to get the line's ID
-            2. Call insert() with the line number, ID and your new content
-
-            Example:
-                # First get ID for the line (must call read first)
-                result = read(5,5)
-                line_id = result["id"]
-
-                # Insert text after line 5
-                insert(id=line_id, line=5, text="New content here")
-
-                # Use find_line to get a specific line's ID
-                matches = find_line("function main")
-                if matches["total_matches"] > 0:
-                    line_id = matches["matches"][0]["id"]
-                    line_num = matches["matches"][0]["line_number"]
-                    insert(id=line_id, line=line_num, text="// New comment")
-
             Args:
-                id (str): ID of the line at the specified line number
+                id_above (str): ID of the line at the specified line number
                           (obtain this from read or find_line)
-                line (int): Line number (1-based) after which to insert text
+                line_above (int): Line number (1-based). Text will be inserted below this line.
                 text (str): Text to insert
 
             Returns:
@@ -210,20 +180,20 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
 
-            if line < 1 or line > len(lines):
+            if line_above < 1 or line_above > len(lines):
                 return {
-                    "error": f"Invalid line number: {line}. File has {len(lines)} lines."
+                    "error": f"Invalid line number: {line_above}. File has {len(lines)} lines."
                 }
 
-            line_content = lines[line - 1]
-            computed_id = calculate_id(line_content, line, line)
+            line_content = lines[line_above - 1]
+            computed_id = calculate_id(line_content, line_above, line_above)
 
-            if computed_id != id:
+            if computed_id != id_above:
                 return {
                     "error": "id verification failed. The line may have been modified since you last read it."
                 }
 
-            lines.insert(line, text if text.endswith("\n") else text + "\n")
+            lines.insert(line_above, text if text.endswith("\n") else text + "\n")
 
             try:
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
@@ -231,7 +201,7 @@ class TextEditorServer:
 
                 result = {
                     "status": "success",
-                    "message": f"Text inserted after line {line}",
+                    "message": f"Text inserted after line {line_above}",
                 }
                 return result
             except Exception as e:
