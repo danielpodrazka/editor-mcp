@@ -6,10 +6,10 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 
 - **File Selection**: Set a file to work with using absolute paths
 - **Read Operations**: Read entire files or specific line ranges
-- **Edit Operations**: Three editing modes:
-  - Insert text at a specific line
-  - Overwrite text within a line range
-  - Create new files or replace content entirely
+- **Edit Operations**: 
+  - Insert lines after a specific line
+  - Remove lines within a line range
+  - Create new files with content
 - **File Deletion**: Remove files from the filesystem
 - **Hash Verification**: Ensures data integrity during editing operations
 
@@ -44,54 +44,76 @@ Sets the current file to work with.
 - Confirmation message with the file path
 
 #### 2. `get_text`
-Reads text from the current file.
+Reads text from the current file. Use to get lines_hash for the editing.
 
 **Parameters**:
-- `line_start` (int, optional): Start line number (1-based indexing)
-- `line_end` (int, optional): End line number (1-based indexing)
-- `include_line_numbers` (bool, optional): If True, prefixes each line with its line number (default: True)
+- `line_start` (int, optional): Start line number (1-based indexing). If omitted but line_end is provided, starts at line 1.
+- `line_end` (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
 
 **Returns**:
-- Dictionary containing the text (optionally with line numbers) and its hash if the file has fewer than MAX_EDIT_LINES lines
+- Dictionary containing the text with each line prefixed with its line number (e.g., "1|text"), and lines range hash if file has <= MAX_EDIT_LINES lines
 
-**Example output with line numbers**:
+**Example output**:
 ```
-1 | def hello():
-2 |     print("Hello, world!")
-3 | 
-4 | hello()
+{"text": "1|def hello():\n2|    print(\"Hello, world!\")\n3|\n4|hello()", "lines_hash": "L1-4-a1b2c3"}
 ```
 
-#### 3. `edit_text`
-Edits text in the current file using various modes.
+#### 3. `insert_lines`
+Insert lines of text after a specific line in the current file.
 
 **Parameters**:
-- `mode` (str): Edit mode - 'insert', 'overwrite', or 'create'
-- `text` (str): Text to insert, overwrite, or create
-- `line` (int, optional): Line number for insert mode (1-based)
-- `line_start` (int, optional): Start line for overwrite mode (1-based)
-- `line_end` (int, optional): End line for overwrite mode (1-based)
-- `lines_hash` (str, optional): Hash of line(s) being modified (required for insert and overwrite)
+- `lines_hash` (str): Hash of the line at the specified line number
+- `line` (int): Line number (1-based) after which to insert text
+- `text` (str): Text to insert
 
 **Returns**:
-- Operation result with status and new hash if applicable
+- Operation result with status
 
-**Note**: In overwrite mode, you can:
-- Replace a smaller number of lines with a larger number (e.g., replace 2 lines with 10)
-- Replace lines with an empty string to remove them (e.g., replace 10 lines with nothing)
-- The number of new lines doesn't need to match the original range
-- The behavior works like copy-paste: original lines are removed, new content is inserted at that position, and any content that follows remains intact
+**Note**:
+- This tool is the preferred way to add new content into a file
+- The hash verification ensures the file hasn't changed since you last read it
+- The text will be inserted immediately after the specified line
+- Use together with remove_lines to replace content
+- Don't insert more than 50 lines at a time to prevent hitting limits
 
-#### 4. `delete_current_file`
-Deletes the currently set file.
+#### 4. `remove_lines`
+Remove a range of lines from the current file.
+
+**Parameters**:
+- `line_start` (int): Start line number (1-based)
+- `line_end` (int): End line number (1-based)
+- `lines_hash` (str): Hash of the lines in the specified range
 
 **Returns**:
 - Operation result with status and message
 
+**Note**:
+- The hash verification ensures the file content hasn't changed since you last read it
+- Use together with insert_lines to replace content
+
+#### 5. `delete_file`
+Delete the currently set file.
+
+**Returns**:
+- Operation result with status and message
+
+#### 6. `new_file`
+Create a new file with the provided content.
+
+**Parameters**:
+- `absolute_file_path` (str): Path of the new file
+- `text` (str): Content to write to the new file
+
+**Returns**:
+- Operation result with status and hash of the content if applicable
+
+**Note**:
+- This tool will fail if the current file exists and is not empty
+
 ## Configuration
 
 Environment variables:
-- `MAX_EDIT_LINES`: Maximum number of lines that can be edited with hash verification (default: 50)
+- `MAX_EDIT_LINES`: Maximum number of lines that can be edited with hash verification (default: 200)
 
 ## Development
 
@@ -128,14 +150,22 @@ The test suite covers:
    - Edge cases like empty files
    - Invalid range handling
 
-3. **edit_text tool**
-   - Insert mode validation
-   - Overwrite mode validation
-   - Create mode validation
+3. **insert_lines tool**
+   - Line validation
    - Hash verification
+   - Content insertion validation
    
-4. **delete_current_file tool**
+4. **remove_lines tool**
+   - Line range validation
+   - Hash verification
+   - Content removal validation
+
+5. **delete_file tool**
    - File deletion validation
+
+6. **new_file tool**
+   - File creation validation
+   - Handling existing files
 
 ## How it Works
 
@@ -148,13 +178,15 @@ The hashing mechanism uses SHA-256 to generate a hash of the file content or sel
 The main `TextEditorServer` class:
 
 1. Initializes with a FastMCP instance named "text-editor"
-2. Sets a configurable `max_edit_lines` limit (default: 50) from environment variables
+2. Sets a configurable `max_edit_lines` limit (default: 200) from environment variables
 3. Maintains the current file path as state
-4. Registers four primary tools through FastMCP:
+4. Registers six primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
-   - `get_text`: Reads content with optional line numbering and hash generation
-   - `edit_text`: Provides three editing modes with hash verification
-   - `delete_current_file`: Removes files with proper cleanup
+   - `get_text`: Reads content with line numbering and hash generation
+   - `insert_lines`: Inserts text after a specific line
+   - `remove_lines`: Removes a range of lines
+   - `delete_file`: Deletes the current file
+   - `new_file`: Creates a new file with content
 
 The server runs using FastMCP's stdio transport by default, making it easy to integrate with various clients.
 
