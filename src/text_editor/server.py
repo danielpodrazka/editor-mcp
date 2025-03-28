@@ -15,13 +15,13 @@ def calculate_hash(text: str, line_start: int = None, line_end: int = None) -> s
     Returns:
         str: Hex digest of SHA-256 hash
     """
-    prefix = ""
+    suffix = ""
     if line_start and line_end:
-        prefix = f"L{line_start}-{line_end}-"
+        suffix = f"L{line_start}-{line_end}-"
         if line_start == line_end:
-            prefix = f"L{line_start}-"
+            suffix = f"L{line_start}-"
 
-    return f"{prefix}{hashlib.sha256(text.encode()).hexdigest()[:2]}"
+    return f"{hashlib.sha256(text.encode()).hexdigest()[:2]}{suffix}"
 
 
 class TextEditorServer:
@@ -83,7 +83,7 @@ class TextEditorServer:
                 line_end (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
 
             Returns:
-                dict: Dictionary containing the text with each line prefixed with its line number (e.g., "1|text"), and lines range hash if file has <= self.max_edit_lines lines
+                dict: Dictionary containing the text with each line prefixed with its line hash (e.g., "d0L1|text"), and lines range hash if file has <= self.max_edit_lines lines
             """
             result = {}
 
@@ -108,7 +108,7 @@ class TextEditorServer:
                 selected_lines = lines[line_start - 1 : line_end]
                 numbered_lines = []
                 for i, line in enumerate(selected_lines, start=line_start):
-                    numbered_lines.append(f"{i}|{line}")
+                    numbered_lines.append(f"{calculate_hash(line)}|{line}")
 
                 text = "".join(numbered_lines)
                 result["text"] = text
