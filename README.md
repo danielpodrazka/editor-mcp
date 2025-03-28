@@ -11,7 +11,6 @@ A Python-based text editor server built with FastMCP that provides tools for fil
   - Remove lines within a line range
   - Create new files with content
 - **File Deletion**: Remove files from the filesystem
-- **Hash Verification**: Ensures data integrity during editing operations
 - **Search Operations**: Find lines containing specific text
 
 ## Installation
@@ -44,26 +43,24 @@ Sets the current file to work with.
 **Returns**:
 - Confirmation message with the file path
 
-#### 2. `get_text`
-Reads text from the current file. Use to get lines_hash for the editing.
+
+#### 2. `read`
+Reads text from the current file. Use to get id for the editing.
 
 **Parameters**:
-- `line_start` (int, optional): Start line number (1-based indexing). If omitted but line_end is provided, starts at line 1.
-- `line_end` (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
+- `start` (int, optional): Start line number (1-based indexing). If omitted but end is provided, starts at line 1.
+- `end` (int, optional): End line number (1-based indexing). If omitted but start is provided, goes to the end of the file.
 
 **Returns**:
-- Dictionary containing the text with each line prefixed with its line number (e.g., "1|text"), and lines range hash if file has <= MAX_EDIT_LINES lines
+- Dictionary containing the text and lines range id if file has <= MAX_EDIT_LINES lines
 
 **Example output**:
 ```
-{"text": "1|def hello():\n2|    print(\"Hello, world!\")\n3|\n4|hello()", "lines_hash": "L1-4-a1b2c3"}
+{"text": "def hello():\n    print(\"Hello, world!\")\n\nhello()", "id": "L1-4-a1b2c3"}
 ```
 
-#### 3. `insert_lines`
-Insert lines of text after a specific line in the current file.
 
 **Parameters**:
-- `lines_hash` (str): Hash of the line at the specified line number
 - `line` (int): Line number (1-based) after which to insert text
 - `text` (str): Text to insert
 
@@ -77,7 +74,6 @@ Insert lines of text after a specific line in the current file.
 - Use together with remove_lines to replace content
 - Don't insert more than 50 lines at a time to prevent hitting limits
 
-#### 4. `remove_lines`
 Remove a range of lines from the current file.
 
 **Parameters**:
@@ -127,7 +123,7 @@ Find lines that match provided text in the current file.
   "matches": [
     {
       "line_number": 2,
-      "lines_hash": "L2-a1b2c3",
+      "id": "L2-a1",
       "text": "    print(\"Hello, world!\")\n"
     }
   ],
@@ -138,7 +134,7 @@ Find lines that match provided text in the current file.
 **Note**:
 - Returns an error if no file path is set
 - Searches for exact text matches within each line
-- The lines_hash can be used for subsequent edit operations
+- The id can be used for subsequent edit operations
 ## Configuration
 
 Environment variables:
@@ -172,21 +168,21 @@ The test suite covers:
    - Setting valid files
    - Setting non-existent files
    
-2. **get_text tool**
+2. **read tool**
    - File state validation
    - Reading entire files
    - Reading specific line ranges
    - Edge cases like empty files
    - Invalid range handling
 
-3. **insert_lines tool**
+3. **insert tool**
    - Line validation
-   - Hash verification
+   - ID verification
    - Content insertion validation
    
-4. **remove_lines tool**
+4. **remove tool**
    - Line range validation
-   - Hash verification
+   - ID verification
    - Content removal validation
 
 5. **delete_file tool**
@@ -205,9 +201,9 @@ The test suite covers:
 
 ## How it Works
 
-The server uses FastMCP to expose text editing capabilities through a well-defined API. The hash verification system ensures data integrity by verifying that the content hasn't changed between reading and modifying operations.
+The server uses FastMCP to expose text editing capabilities through a well-defined API. The ID verification system ensures data integrity by verifying that the content hasn't changed between reading and modifying operations.
 
-The hashing mechanism uses SHA-256 to generate a hash of the file content or selected line ranges. For line-specific operations, the hash includes a prefix indicating the line range (e.g., "L10-15-[hash]"). This helps ensure that edits are being applied to the expected content.
+The ID mechanism uses SHA-256 to generate a unique identifier of the file content or selected line ranges. For line-specific operations, the ID includes a prefix indicating the line range (e.g., "L10-15-[hash]"). This helps ensure that edits are being applied to the expected content.
 
 ## Implementation Details
 
@@ -218,9 +214,9 @@ The main `TextEditorServer` class:
 3. Maintains the current file path as state
 4. Registers seven primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
-   - `get_text`: Reads content with line numbering and hash generation
-   - `insert_lines`: Inserts text after a specific line
-   - `remove_lines`: Removes a range of lines
+   - `read`: Reads content and generates content IDs
+   - `insert`: Inserts text after a specific line
+   - `remove`: Removes a range of lines
    - `delete_file`: Deletes the current file
    - `new_file`: Creates a new file with content
    - `find_line`: Finds lines containing specific text
@@ -235,7 +231,7 @@ If you encounter issues:
 2. Verify that the file paths are absolute
 3. Ensure the environment is using Python 3.7+
 4. Validate line numbers (they are 1-based, not 0-based)
-5. Confirm hash verification by reading content before attempting to edit it
+5. Confirm ID verification by reading content before attempting to edit it
 
 - Each test provides a detailed message when it fails
 
@@ -249,7 +245,7 @@ If you encounter issues:
        "command": "/home/daniel/pp/venvs/mcp-text-editor/bin/python",
        "args": ["/home/daniel/pp/mcp-text-editor/src/text_editor/server.py"],
         "env": {
-          "MAX_EDIT_LINES": "10"
+          "MAX_EDIT_LINES": "100"
         }
      }
   }

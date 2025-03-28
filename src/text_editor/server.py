@@ -200,7 +200,7 @@ class TextEditorServer:
 
             Notes:
                 - The id verification ensures the file content hasn't changed since you last read it
-                - Use together with insert_lines to replace content
+                - Use together with insert to replace content
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -326,7 +326,7 @@ class TextEditorServer:
             search_text: str,
         ) -> Dict[str, Any]:
             """
-            Find lines that match provided text in the current file.
+            Find lines that match provided text in the current file. Can be used to get the ID before calling insert
 
             Args:
                 search_text (str): Text to search for in the file
