@@ -87,7 +87,7 @@ class TestTextEditorServer:
         result = await get_text_fn()
 
         assert "text" in result
-        assert "1|Line 1\n2|Line 2\n3|Line 3\n4|Line 4\n5|Line 5\n" == result["text"]
+        assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == result["text"]
         assert "lines_hash" in result
 
     @pytest.mark.asyncio
@@ -102,7 +102,7 @@ class TestTextEditorServer:
 
         assert "text" in result
         assert "lines_hash" in result
-        assert "2|Line 2\n3|Line 3\n4|Line 4\n" == result["text"]
+        assert "Line 2\nLine 3\nLine 4\n" == result["text"]
 
         expected_hash = calculate_hash("Line 2\nLine 3\nLine 4\n", 2, 4)
         assert expected_hash == result["lines_hash"]
@@ -116,7 +116,7 @@ class TestTextEditorServer:
         get_text_fn = self.get_tool_fn(server, "get_text")
         result = await get_text_fn(3)
 
-        assert "3|Line 3\n4|Line 4\n5|Line 5\n" == result["text"]
+        assert "Line 3\nLine 4\nLine 5\n" == result["text"]
         expected_hash = calculate_hash("Line 3\nLine 4\nLine 5\n", 3, 5)
         assert expected_hash == result["lines_hash"]
 
@@ -129,7 +129,7 @@ class TestTextEditorServer:
         get_text_fn = self.get_tool_fn(server, "get_text")
         result = await get_text_fn(None, 2)
 
-        assert "1|Line 1\n2|Line 2\n" == result["text"]
+        assert "Line 1\nLine 2\n" == result["text"]
         expected_hash = calculate_hash("Line 1\nLine 2\n", 1, 2)
         assert expected_hash == result["lines_hash"]
 
@@ -158,7 +158,7 @@ class TestTextEditorServer:
         get_text_fn = self.get_tool_fn(server, "get_text")
         result = await get_text_fn(3, 10)
 
-        assert "3|Line 3\n4|Line 4\n5|Line 5\n" == result["text"]
+        assert "Line 3\nLine 4\nLine 5\n" == result["text"]
 
     def test_calculate_hash_function(self):
         """Test the calculate_hash function directly."""
@@ -339,10 +339,7 @@ class TestTextEditorServer:
         # First, read the entire file to verify initial state
         get_text_fn = self.get_tool_fn(server, "get_text")
         initial_result = await get_text_fn()
-        assert (
-            "1|Line 1\n2|Line 2\n3|Line 3\n4|Line 4\n5|Line 5\n"
-            == initial_result["text"]
-        )
+        assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == initial_result["text"]
 
         # Get hash for lines 2-4
         result = await get_text_fn(2, 4)
@@ -415,10 +412,7 @@ class TestTextEditorServer:
         # First, read the file to verify initial state
         get_text_fn = self.get_tool_fn(server, "get_text")
         initial_result = await get_text_fn()
-        assert (
-            "1|Line 1\n2|Line 2\n3|Line 3\n4|Line 4\n5|Line 5\n"
-            == initial_result["text"]
-        )
+        assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == initial_result["text"]
 
         # Get hash for lines 2-4 that we want to replace
         result = await get_text_fn(2, 4)

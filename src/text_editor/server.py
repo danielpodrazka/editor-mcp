@@ -15,13 +15,13 @@ def calculate_hash(text: str, line_start: int = None, line_end: int = None) -> s
     Returns:
         str: Hex digest of SHA-256 hash
     """
-    suffix = ""
+    prefix = ""
     if line_start and line_end:
-        suffix = f"L{line_start}-{line_end}"
+        prefix = f"L{line_start}-{line_end}-"
         if line_start == line_end:
-            suffix = f"L{line_start}"
+            prefix = f"L{line_start}-"
 
-    return f"{hashlib.sha256(text.encode()).hexdigest()[:2]}{suffix}"
+    return f"{prefix}{hashlib.sha256(text.encode()).hexdigest()[:2]}"
 
 
 class TextEditorServer:
@@ -83,7 +83,7 @@ class TextEditorServer:
                 line_end (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
 
             Returns:
-                dict: Dictionary containing the text with each line prefixed with its line hash (e.g., "d0L1|text"), and lines range hash if file has <= self.max_edit_lines lines
+                dict: Dictionary containing the text with each line, and lines range hash if file has <= self.max_edit_lines lines
             """
             result = {}
 
@@ -106,11 +106,8 @@ class TextEditorServer:
                     return {"error": "line_start cannot be greater than line_end"}
 
                 selected_lines = lines[line_start - 1 : line_end]
-                numbered_lines = []
-                for i, line in enumerate(selected_lines, start=line_start):
-                    numbered_lines.append(f"{calculate_hash(line,i,i)}|{line}")
 
-                text = "".join(numbered_lines)
+                text = "".join(selected_lines)
                 result["text"] = text
                 if len(selected_lines) <= self.max_edit_lines:
                     original_text = "".join(selected_lines)
