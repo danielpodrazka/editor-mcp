@@ -17,9 +17,9 @@ def calculate_hash(text: str, line_start: int = None, line_end: int = None) -> s
     """
     suffix = ""
     if line_start and line_end:
-        suffix = f"L{line_start}-{line_end}-"
+        suffix = f"L{line_start}-{line_end}"
         if line_start == line_end:
-            suffix = f"L{line_start}-"
+            suffix = f"L{line_start}"
 
     return f"{hashlib.sha256(text.encode()).hexdigest()[:2]}{suffix}"
 
@@ -108,7 +108,7 @@ class TextEditorServer:
                 selected_lines = lines[line_start - 1 : line_end]
                 numbered_lines = []
                 for i, line in enumerate(selected_lines, start=line_start):
-                    numbered_lines.append(f"{calculate_hash(line)}|{line}")
+                    numbered_lines.append(f"{calculate_hash(line,i,i)}|{line}")
 
                 text = "".join(numbered_lines)
                 result["text"] = text
