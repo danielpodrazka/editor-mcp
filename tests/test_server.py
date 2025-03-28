@@ -88,7 +88,7 @@ class TestTextEditorServer:
 
         assert "text" in result
         assert "1|Line 1\n2|Line 2\n3|Line 3\n4|Line 4\n5|Line 5\n" == result["text"]
-        assert "lines_hash" not in result
+        assert "lines_hash" in result
 
     @pytest.mark.asyncio
     async def test_get_text_line_range(self, server, temp_file):
@@ -175,9 +175,9 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_get_text_large_file(self, server):
         """Test getting text from a file larger than MAX_EDIT_LINES lines."""
-
+        more_than_max_lines = server.max_edit_lines + 10
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
-            for i in range(server.max_edit_lines + 10):
+            for i in range(more_than_max_lines):
                 f.write(f"Line {i + 1}\n")
             large_file_path = f.name
 
@@ -189,9 +189,11 @@ class TestTextEditorServer:
             result = await get_text_fn()
 
             assert "text" in result
-            assert "lines_hash" not in result
-            assert f"No line_start/line_end provided so no hash" in result["info"]
-            assert len(result["text"].splitlines()) == server.max_edit_lines + 10
+            assert (
+                f"len(selected_lines)={more_than_max_lines} > self.max_edit_lines={server.max_edit_lines} so no hash."
+                in result["info"]
+            )
+            assert len(result["text"].splitlines()) == more_than_max_lines
 
             result = await get_text_fn(5, 15)
 

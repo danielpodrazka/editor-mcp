@@ -91,14 +91,6 @@ class TextEditorServer:
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
-                if line_start is None and line_end is None:
-                    numbered_lines = []
-                    for i, line in enumerate(lines, start=1):
-                        numbered_lines.append(f"{i}|{line}")
-                    text = "".join(numbered_lines)
-                    result["text"] = text
-                    result["info"] = "No line_start/line_end provided so no hash"
-                    return result
 
                 if line_start is None:
                     line_start = 1
