@@ -328,8 +328,8 @@ class TestTextEditorServer:
         assert "id verification failed" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_remove_lines(self, server, temp_file):
-        """Test remove_lines functionality."""
+    async def test_remove(self, server, temp_file):
+        """Test remove functionality."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
@@ -344,8 +344,8 @@ class TestTextEditorServer:
         id = result["id"]
 
         # Remove lines 2-4
-        remove_lines_fn = self.get_tool_fn(server, "remove_lines")
-        result = await remove_lines_fn(start=2, end=4, id=id)
+        remove_fn = self.get_tool_fn(server, "remove")
+        result = await remove_fn(start=2, end=4, id=id)
 
         assert result["status"] == "success"
         assert "Lines 2 to 4 removed" in result["message"]
@@ -361,22 +361,22 @@ class TestTextEditorServer:
         result = await read_fn(1, 1)
         line_id = result["id"]
 
-        result = await remove_lines_fn(start=1, end=1, id="invalid-id")
+        result = await remove_fn(start=1, end=1, id="invalid-id")
         assert "error" in result
         assert "id verification failed" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_remove_lines_validation(self, server, temp_file):
-        """Test remove_lines validation checks."""
+    async def test_remove_validation(self, server, temp_file):
+        """Test remove validation checks."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        remove_lines_fn = self.get_tool_fn(server, "remove_lines")
+        remove_fn = self.get_tool_fn(server, "remove")
 
         # Test no file set
         server.current_file_path = None
-        result = await remove_lines_fn(start=1, end=2, id="dummy")
+        result = await remove_fn(start=1, end=2, id="dummy")
         assert "error" in result
         assert "No file path is set" in result["error"]
 
@@ -384,23 +384,23 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         # Test start < 1
-        result = await remove_lines_fn(start=0, end=2, id="dummy")
+        result = await remove_fn(start=0, end=2, id="dummy")
         assert "error" in result
         assert "start must be at least 1" in result["error"]
 
         # Test end > file length
-        result = await remove_lines_fn(start=1, end=10, id="dummy")
+        result = await remove_fn(start=1, end=10, id="dummy")
         assert "error" in result
         assert "end (10) exceeds file length" in result["error"]
 
         # Test start > end
-        result = await remove_lines_fn(start=3, end=2, id="dummy")
+        result = await remove_fn(start=3, end=2, id="dummy")
         assert "error" in result
         assert "start cannot be greater than end" in result["error"]
 
     @pytest.mark.asyncio
     async def test_replace_text_with_remove_and_insert(self, server, temp_file):
-        """Test using remove_lines and insert together to replace content (replacing overwrite_text)."""
+        """Test using remove and insert together to replace content (replacing overwrite_text)."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
@@ -415,8 +415,8 @@ class TestTextEditorServer:
         id = result["id"]
 
         # Step 1: Remove lines 2-4
-        remove_lines_fn = self.get_tool_fn(server, "remove_lines")
-        result = await remove_lines_fn(start=2, end=4, id=id)
+        remove_fn = self.get_tool_fn(server, "remove")
+        result = await remove_fn(start=2, end=4, id=id)
         assert result["status"] == "success"
 
         # Step 2: Get id for the line before where we want to insert (now line 1)

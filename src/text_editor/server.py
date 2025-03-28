@@ -182,7 +182,7 @@ class TextEditorServer:
                 return {"error": f"Error writing to file: {str(e)}"}
 
         @self.mcp.tool()
-        async def remove_lines(
+        async def remove(
             id: str,
             start: int,
             end: int,
