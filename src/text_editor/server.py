@@ -15,10 +15,12 @@ def calculate_hash(text: str, line_start: int = None, line_end: int = None) -> s
     Returns:
         str: Hex digest of SHA-256 hash
     """
+    prefix = ""
     if line_start and line_end:
         prefix = f"L{line_start}-{line_end}-"
-    else:
-        prefix = ""
+        if line_start == line_end:
+            prefix = f"L{line_start}-"
+
     return f"{prefix}{hashlib.sha256(text.encode()).hexdigest()[:2]}"
 
 
