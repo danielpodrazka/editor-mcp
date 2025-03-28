@@ -29,7 +29,7 @@ class TextEditorServer:
     This class provides a set of tools for interacting with text files, including:
     - Setting the current file to work with
     - Reading text content from files
-    - Editing file content through separate tools for inserting and overwriting text
+    - Editing file content through separate tools for inserting, removing, and overwriting text
     - Creating new files
     - Deleting files
 
@@ -150,9 +150,10 @@ class TextEditorServer:
                 dict: Operation result with status and new hash if applicable
 
             Notes:
-                - This is the preferred tool for inserting new content into a file
+                - This tool is the preferred way to add new content into a file
                 - The hash verification ensures the file hasn't changed since you last read it
                 - The text will be inserted immediately after the specified line
+                - Use together with remove_lines to replace content (instead of overwrite_text)
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -197,17 +198,15 @@ class TextEditorServer:
                 return {"error": f"Error writing to file: {str(e)}"}
 
         @self.mcp.tool()
-        async def overwrite_text(
-            text: str,
+        async def remove_lines(
             line_start: int,
             line_end: int,
             lines_hash: str,
         ) -> Dict[str, Any]:
             """
-            Overwrite a range of lines in the current file with new text.
+            Remove a range of lines from the current file.
 
             Args:
-                text (str): New text to replace the specified range
                 line_start (int): Start line number (1-based)
                 line_end (int): End line number (1-based)
                 lines_hash (str): Hash of the lines in the specified range
@@ -216,12 +215,9 @@ class TextEditorServer:
                 dict: Operation result with status and message
 
             Notes:
-                - This tool allows replacing a range of lines with new content
-                - The number of new lines can differ from the original range
-                - To remove lines, provide an empty string as the text parameter
-                - The behavior mimics copy-paste: original lines are removed, new lines are
-                  inserted at that position, and any content after the original section
-                  is preserved and will follow the new content
+                - This tool allows removing a specific range of lines from a file
+                - The hash verification ensures the file content hasn't changed since you last read it
+                - Use together with insert_lines to replace content
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -243,13 +239,12 @@ class TextEditorServer:
             if line_start > line_end:
                 return {"error": "line_start cannot be greater than line_end."}
 
-            if line_end - line_start + 1 > self.max_edit_lines:
+            if line_end - line_start + 1 > 200:
                 return {
-                    "error": f"Cannot overwrite more than {self.max_edit_lines} lines at once (attempted {line_end - line_start + 1} lines)."
+                    "error": f"Cannot remove more than 200 lines at once (attempted {line_end - line_start + 1} lines)."
                 }
 
             current_content = "".join(lines[line_start - 1 : line_end])
-
             computed_hash = calculate_hash(current_content, line_start, line_end)
 
             if computed_hash != lines_hash:
@@ -257,15 +252,9 @@ class TextEditorServer:
                     "error": "Hash verification failed. The content may have been modified since you last read it."
                 }
 
-            new_text = text
-            if not new_text.endswith("\n") and line_end < len(lines):
-                new_text += "\n"
-
-            new_lines = new_text.splitlines(True)
-
             before = lines[: line_start - 1]
             after = lines[line_end:]
-            modified_lines = before + new_lines + after
+            modified_lines = before + after
 
             try:
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
@@ -273,7 +262,7 @@ class TextEditorServer:
 
                 result = {
                     "status": "success",
-                    "message": f"Text overwritten from line {line_start} to {line_end}",
+                    "message": f"Lines {line_start} to {line_end} removed",
                 }
 
                 return result
