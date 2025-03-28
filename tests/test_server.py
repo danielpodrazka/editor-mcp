@@ -67,38 +67,38 @@ class TestTextEditorServer:
         assert server.current_file_path is None
 
     @pytest.mark.asyncio
-    async def test_get_text_no_file_set(self, server):
+    async def test_read_no_file_set(self, server):
         """Test getting text when no file is set."""
-        get_text_fn = self.get_tool_fn(server, "get_text")
+        read_fn = self.get_tool_fn(server, "read")
 
-        result = await get_text_fn()
+        result = await read_fn()
 
         assert "error" in result
         assert "No file path is set" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_get_text_entire_file(self, server, temp_file):
+    async def test_read_entire_file(self, server, temp_file):
         """Test getting the entire content of a file."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn()
+        read_fn = self.get_tool_fn(server, "read")
+        result = await read_fn()
 
         assert "text" in result
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == result["text"]
         assert "id" in result
 
     @pytest.mark.asyncio
-    async def test_get_text_line_range(self, server, temp_file):
+    async def test_read_line_range(self, server, temp_file):
         """Test getting a specific range of lines from a file."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 4)
+        read_fn = self.get_tool_fn(server, "read")
+        result = await read_fn(2, 4)
 
         assert "text" in result
         assert "id" in result
@@ -108,55 +108,55 @@ class TestTextEditorServer:
         assert expected_id == result["id"]
 
     @pytest.mark.asyncio
-    async def test_get_text_only_start_line(self, server, temp_file):
+    async def test_read_only_start_line(self, server, temp_file):
         """Test getting text with only start line specified."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3)
+        read_fn = self.get_tool_fn(server, "read")
+        result = await read_fn(3)
 
         assert "Line 3\nLine 4\nLine 5\n" == result["text"]
         expected_id = calculate_id("Line 3\nLine 4\nLine 5\n", 3, 5)
         assert expected_id == result["id"]
 
     @pytest.mark.asyncio
-    async def test_get_text_only_end_line(self, server, temp_file):
+    async def test_read_only_end_line(self, server, temp_file):
         """Test getting text with only end line specified."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(None, 2)
+        read_fn = self.get_tool_fn(server, "read")
+        result = await read_fn(None, 2)
 
         assert "Line 1\nLine 2\n" == result["text"]
         expected_id = calculate_id("Line 1\nLine 2\n", 1, 2)
         assert expected_id == result["id"]
 
     @pytest.mark.asyncio
-    async def test_get_text_invalid_range(self, server, temp_file):
+    async def test_read_invalid_range(self, server, temp_file):
         """Test getting text with an invalid line range."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        get_text_fn = self.get_tool_fn(server, "get_text")
+        read_fn = self.get_tool_fn(server, "read")
 
-        result = await get_text_fn(4, 2)
+        result = await read_fn(4, 2)
         assert "error" in result
         assert "line_start cannot be greater than line_end" in result["error"]
 
-        result = await get_text_fn(0, 3)
+        result = await read_fn(0, 3)
         assert "error" in result
         assert "line_start must be at least 1" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_get_text_range_exceeding_file(self, server, temp_file):
+    async def test_read_range_exceeding_file(self, server, temp_file):
         """Test getting a line range that exceeds the file's line count."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3, 10)
+        read_fn = self.get_tool_fn(server, "read")
+        result = await read_fn(3, 10)
 
         assert "Line 3\nLine 4\nLine 5\n" == result["text"]
 
@@ -173,7 +173,7 @@ class TestTextEditorServer:
         assert id_with_range.endswith(expected)
 
     @pytest.mark.asyncio
-    async def test_get_text_large_file(self, server):
+    async def test_read_large_file(self, server):
         """Test getting text from a file larger than MAX_EDIT_LINES lines."""
         more_than_max_lines = server.max_edit_lines + 10
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
@@ -185,8 +185,8 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(large_file_path)
 
-            get_text_fn = self.get_tool_fn(server, "get_text")
-            result = await get_text_fn()
+            read_fn = self.get_tool_fn(server, "read")
+            result = await read_fn()
 
             assert "text" in result
             assert (
@@ -195,13 +195,13 @@ class TestTextEditorServer:
             )
             assert len(result["text"].splitlines()) == more_than_max_lines
 
-            result = await get_text_fn(5, 15)
+            result = await read_fn(5, 15)
 
             assert "text" in result
             assert "id" in result
             assert len(result["text"].splitlines()) == 11
 
-            result = await get_text_fn(5, server.max_edit_lines + 10)
+            result = await read_fn(5, server.max_edit_lines + 10)
 
             assert "text" in result
             assert "id" not in result
@@ -304,8 +304,8 @@ class TestTextEditorServer:
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 2)
+        read_fn = self.get_tool_fn(server, "read")
+        result = await read_fn(2, 2)
         line_content = result["text"]
         line_id = result["id"]
 
@@ -315,7 +315,7 @@ class TestTextEditorServer:
 
         assert result["status"] == "success"
 
-        result = await get_text_fn()
+        result = await read_fn()
         assert new_text in result["text"]
 
         lines = result["text"].splitlines()
@@ -337,12 +337,12 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         # First, read the entire file to verify initial state
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        initial_result = await get_text_fn()
+        read_fn = self.get_tool_fn(server, "read")
+        initial_result = await read_fn()
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == initial_result["text"]
 
         # Get id for lines 2-4
-        result = await get_text_fn(2, 4)
+        result = await read_fn(2, 4)
         id = result["id"]
 
         # Remove lines 2-4
@@ -353,19 +353,17 @@ class TestTextEditorServer:
         assert "Lines 2 to 4 removed" in result["message"]
 
         # Verify the file now only has lines 1 and 5
-        result = await get_text_fn()
+        result = await read_fn()
         lines = result["text"].splitlines()
         assert len(lines) == 2
         assert "Line 1" in lines[0]
         assert "Line 5" in lines[1]
 
         # Test id verification failure
-        result = await get_text_fn(1, 1)
+        result = await read_fn(1, 1)
         line_id = result["id"]
 
-        result = await remove_lines_fn(
-            line_start=1, line_end=1, id="invalid-id"
-        )
+        result = await remove_lines_fn(line_start=1, line_end=1, id="invalid-id")
         assert "error" in result
         assert "id verification failed" in result["error"]
 
@@ -410,12 +408,12 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         # First, read the file to verify initial state
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        initial_result = await get_text_fn()
+        read_fn = self.get_tool_fn(server, "read")
+        initial_result = await read_fn()
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == initial_result["text"]
 
         # Get id for lines 2-4 that we want to replace
-        result = await get_text_fn(2, 4)
+        result = await read_fn(2, 4)
         id = result["id"]
 
         # Step 1: Remove lines 2-4
@@ -424,7 +422,7 @@ class TestTextEditorServer:
         assert result["status"] == "success"
 
         # Step 2: Get id for the line before where we want to insert (now line 1)
-        result = await get_text_fn(1, 1)
+        result = await read_fn(1, 1)
         line_1_id = result["id"]
 
         # Step 3: Insert new content after line 1
@@ -434,7 +432,7 @@ class TestTextEditorServer:
         assert result["status"] == "success"
 
         # Verify final content
-        result = await get_text_fn()
+        result = await read_fn()
         lines = result["text"].splitlines()
 
         assert len(lines) == 5
@@ -448,87 +446,87 @@ class TestTextEditorServer:
     async def test_find_line_no_file_set(self, server):
         """Test find_line with no file set."""
         find_line_fn = self.get_tool_fn(server, "find_line")
-        
+
         result = await find_line_fn(search_text="Line")
-        
+
         assert "error" in result
         assert "No file path is set" in result["error"]
-    
+
     @pytest.mark.asyncio
     async def test_find_line_basic(self, server, temp_file):
         """Test basic find_line functionality."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-        
+
         find_line_fn = self.get_tool_fn(server, "find_line")
-        
+
         # Search for a common term that should be in all lines
         result = await find_line_fn(search_text="Line")
-        
+
         assert "status" in result
         assert result["status"] == "success"
         assert "matches" in result
         assert "total_matches" in result
         assert result["total_matches"] == 5
-        
+
         # Verify structure of the matches
         for match in result["matches"]:
             assert "line_number" in match
             assert "id" in match
             assert "text" in match
             assert f"Line {match['line_number']}" in match["text"]
-            
+
         # Verify the line numbers are sequential
         line_numbers = [match["line_number"] for match in result["matches"]]
         assert line_numbers == [1, 2, 3, 4, 5]
-    
+
     @pytest.mark.asyncio
     async def test_find_line_specific_match(self, server, temp_file):
         """Test find_line with a specific search term."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-        
+
         find_line_fn = self.get_tool_fn(server, "find_line")
-        
+
         # Search for a term that should only be in one line
         result = await find_line_fn(search_text="Line 3")
-        
+
         assert result["status"] == "success"
         assert result["total_matches"] == 1
         assert len(result["matches"]) == 1
         assert result["matches"][0]["line_number"] == 3
         assert "Line 3" in result["matches"][0]["text"]
-    
+
     @pytest.mark.asyncio
     async def test_find_line_no_matches(self, server, temp_file):
         """Test find_line with a search term that doesn't exist."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-        
+
         find_line_fn = self.get_tool_fn(server, "find_line")
-        
+
         # Search for a non-existent term
         result = await find_line_fn(search_text="NonExistentTerm")
-        
+
         assert result["status"] == "success"
         assert result["total_matches"] == 0
         assert len(result["matches"]) == 0
-    
+
     @pytest.mark.asyncio
     async def test_find_line_file_read_error(self, server, temp_file, monkeypatch):
         """Test find_line with a file read error."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-        
+
         # Mock open to raise an exception
         def mock_open(*args, **kwargs):
             raise IOError("Mock file read error")
-            
+
         monkeypatch.setattr("builtins.open", mock_open)
-        
+
         find_line_fn = self.get_tool_fn(server, "find_line")
         result = await find_line_fn(search_text="Line")
-        
+
         assert "error" in result
         assert "Error searching file" in result["error"]
         assert "Mock file read error" in result["error"]

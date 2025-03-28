@@ -71,7 +71,7 @@ class TextEditorServer:
             return f"File set to: '{absolute_file_path}'"
 
         @self.mcp.tool()
-        async def get_text(
+        async def read(
             line_start: Optional[int] = None,
             line_end: Optional[int] = None,
         ) -> Dict[str, Any]:
