@@ -231,15 +231,15 @@ class TestTextEditorServer:
         assert "error" in result
 
     @pytest.mark.asyncio
-    async def test_delete_current_file(self, server):
-        """Test delete_current_file tool."""
+    async def test_delete_file(self, server):
+        """Test delete_file tool."""
 
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             f.write("Test content to delete")
             temp_path = f.name
 
         try:
-            delete_file_fn = self.get_tool_fn(server, "delete_current_file")
+            delete_file_fn = self.get_tool_fn(server, "delete_file")
             result = await delete_file_fn()
             assert "error" in result
             assert "No file path is set" in result["error"]
@@ -266,8 +266,8 @@ class TestTextEditorServer:
                 os.unlink(temp_path)
 
     @pytest.mark.asyncio
-    async def test_delete_current_file_permission_error(self, server, monkeypatch):
-        """Test delete_current_file with permission error."""
+    async def test_delete_file_permission_error(self, server, monkeypatch):
+        """Test delete_file with permission error."""
 
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             f.write("Test content")
@@ -282,7 +282,7 @@ class TestTextEditorServer:
 
             monkeypatch.setattr(os, "remove", mock_remove)
 
-            delete_file_fn = self.get_tool_fn(server, "delete_current_file")
+            delete_file_fn = self.get_tool_fn(server, "delete_file")
             result = await delete_file_fn()
 
             assert "error" in result
@@ -309,10 +309,9 @@ class TestTextEditorServer:
 
         insert_lines_fn = self.get_tool_fn(server, "insert_lines")
         new_text = "This is a new inserted line."
-        result = await insert_lines_fn(new_text, line=2, lines_hash=line_hash)
+        result = await insert_lines_fn(text=new_text, line=2, lines_hash=line_hash)
 
         assert result["status"] == "success"
-        assert "new_line_hash" in result
 
         result = await get_text_fn()
         assert new_text in result["text"]
@@ -323,7 +322,7 @@ class TestTextEditorServer:
         assert "Line 3" in lines[3]
 
         result = await insert_lines_fn(
-            "This should fail.", line=2, lines_hash="invalid-hash"
+            text="This should fail.", line=2, lines_hash="invalid-hash"
         )
         assert "error" in result
         assert "Hash verification failed" in result["error"]
@@ -403,53 +402,6 @@ class TestTextEditorServer:
         result = await remove_lines_fn(line_start=3, line_end=2, lines_hash="dummy")
         assert "error" in result
         assert "line_start cannot be greater than line_end" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_remove_lines_max_limit(self, server):
-        """Test remove_lines with attempt to remove more than server.max_edit_lines lines."""
-
-        # Create a file with 250 lines
-        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
-            for i in range(server.max_edit_lines + 50):
-                f.write(f"Line {i + 1}\n")
-            large_file_path = f.name
-
-        try:
-            set_file_fn = self.get_tool_fn(server, "set_file")
-            await set_file_fn(large_file_path)
-
-            remove_lines_fn = self.get_tool_fn(server, "remove_lines")
-            result = await remove_lines_fn(
-                line_start=1, line_end=server.max_edit_lines + 1, lines_hash="dummy"
-            )
-
-            assert "error" in result
-            assert (
-                f"Cannot remove more than {server.max_edit_lines} lines at once"
-                in result["error"]
-            )
-
-            # Test removing exactly server.max_edit_lines lines (should work)
-            get_text_fn = self.get_tool_fn(server, "get_text")
-            result = await get_text_fn(1, server.max_edit_lines)
-            lines_hash = result["lines_hash"]
-
-            result = await remove_lines_fn(
-                line_start=1, line_end=server.max_edit_lines, lines_hash=lines_hash
-            )
-
-            assert result["status"] == "success"
-            assert f"Lines 1 to {server.max_edit_lines} removed" in result["message"]
-
-            # Verify there are only 50 lines left
-            result = await get_text_fn()
-            lines = result["text"].splitlines()
-            assert len(lines) == 50
-            assert f"Line {server.max_edit_lines+1}" in lines[0]
-
-        finally:
-            if os.path.exists(large_file_path):
-                os.unlink(large_file_path)
 
     @pytest.mark.asyncio
     async def test_replace_text_with_remove_and_insert(self, server, temp_file):

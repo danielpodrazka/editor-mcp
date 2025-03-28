@@ -44,7 +44,7 @@ class TextEditorServer:
 
     def __init__(self):
         self.mcp = FastMCP("text-editor")
-        self.max_edit_lines = int(os.getenv("MAX_EDIT_LINES", "50"))
+        self.max_edit_lines = int(os.getenv("MAX_EDIT_LINES", "200"))
         self.current_file_path = None
 
         self.register_tools()
@@ -74,7 +74,7 @@ class TextEditorServer:
             line_end: Optional[int] = None,
         ) -> Dict[str, Any]:
             """
-            Read text from the current file.
+            Read text from the current file. Use to get lines_hash for the editing.
 
             Args:
                 line_start (int, optional): Start line number (1-based indexing). If omitted but line_end is provided, starts at line 1.
@@ -134,26 +134,27 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def insert_lines(
-            text: str,
-            line: int,
             lines_hash: str,
+            line: int,
+            text: str,
         ) -> Dict[str, Any]:
             """
             Insert lines of text after a specific line in the current file.
+            Please don't insert more than 50 lines at a time to prevent hitting limits.
 
             Args:
-                text (str): Text to insert
-                line (int): Line number (1-based) after which to insert text
                 lines_hash (str): Hash of the line at the specified line number
+                line (int): Line number (1-based) after which to insert text
+                text (str): Text to insert.
 
             Returns:
-                dict: Operation result with status and new hash if applicable
+                dict: Operation result with status
 
             Notes:
                 - This tool is the preferred way to add new content into a file
                 - The hash verification ensures the file hasn't changed since you last read it
                 - The text will be inserted immediately after the specified line
-                - Use together with remove_lines to replace content (instead of overwrite_text)
+                - Use together with remove_lines to replace content
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -187,21 +188,15 @@ class TextEditorServer:
                     "status": "success",
                     "message": f"Text inserted after line {line}",
                 }
-
-                new_line_hash = calculate_hash(
-                    text if text.endswith("\n") else text + "\n", line + 1, line + 1
-                )
-                result["new_line_hash"] = new_line_hash
-
                 return result
             except Exception as e:
                 return {"error": f"Error writing to file: {str(e)}"}
 
         @self.mcp.tool()
         async def remove_lines(
+            lines_hash: str,
             line_start: int,
             line_end: int,
-            lines_hash: str,
         ) -> Dict[str, Any]:
             """
             Remove a range of lines from the current file.
@@ -215,7 +210,6 @@ class TextEditorServer:
                 dict: Operation result with status and message
 
             Notes:
-                - This tool allows removing a specific range of lines from a file
                 - The hash verification ensures the file content hasn't changed since you last read it
                 - Use together with insert_lines to replace content
             """
@@ -238,11 +232,6 @@ class TextEditorServer:
 
             if line_start > line_end:
                 return {"error": "line_start cannot be greater than line_end."}
-
-            if line_end - line_start + 1 > 200:
-                return {
-                    "error": f"Cannot remove more than 200 lines at once (attempted {line_end - line_start + 1} lines)."
-                }
 
             current_content = "".join(lines[line_start - 1 : line_end])
             computed_hash = calculate_hash(current_content, line_start, line_end)
@@ -270,7 +259,7 @@ class TextEditorServer:
                 return {"error": f"Error writing to file: {str(e)}"}
 
         @self.mcp.tool()
-        async def delete_current_file() -> Dict[str, Any]:
+        async def delete_file() -> Dict[str, Any]:
             """
             Delete the currently set file.
 
