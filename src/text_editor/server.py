@@ -279,7 +279,7 @@ class TextEditorServer:
             Args:
                 absolute_file_path (str): Path of the new file
                 text (str): Content to write to the new file
-                overwriting_existing_file (bool): You can't overwrite files, so if you try to, the tool will fail.
+                overwriting_existing_file (bool): Defaults to False. You can't overwrite files, so if you try to, the tool will fail.
             Returns:
                 dict: Operation result with status and id of the content if applicable
 
