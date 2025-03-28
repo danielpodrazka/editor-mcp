@@ -3,7 +3,7 @@ import pytest
 import tempfile
 import hashlib
 
-from src.text_editor.server import TextEditorServer, calculate_hash
+from src.text_editor.server import TextEditorServer, calculate_id
 
 
 class TestTextEditorServer:
@@ -88,7 +88,7 @@ class TestTextEditorServer:
 
         assert "text" in result
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == result["text"]
-        assert "lines_hash" in result
+        assert "id" in result
 
     @pytest.mark.asyncio
     async def test_get_text_line_range(self, server, temp_file):
@@ -101,11 +101,11 @@ class TestTextEditorServer:
         result = await get_text_fn(2, 4)
 
         assert "text" in result
-        assert "lines_hash" in result
+        assert "id" in result
         assert "Line 2\nLine 3\nLine 4\n" == result["text"]
 
-        expected_hash = calculate_hash("Line 2\nLine 3\nLine 4\n", 2, 4)
-        assert expected_hash == result["lines_hash"]
+        expected_id = calculate_id("Line 2\nLine 3\nLine 4\n", 2, 4)
+        assert expected_id == result["id"]
 
     @pytest.mark.asyncio
     async def test_get_text_only_start_line(self, server, temp_file):
@@ -117,8 +117,8 @@ class TestTextEditorServer:
         result = await get_text_fn(3)
 
         assert "Line 3\nLine 4\nLine 5\n" == result["text"]
-        expected_hash = calculate_hash("Line 3\nLine 4\nLine 5\n", 3, 5)
-        assert expected_hash == result["lines_hash"]
+        expected_id = calculate_id("Line 3\nLine 4\nLine 5\n", 3, 5)
+        assert expected_id == result["id"]
 
     @pytest.mark.asyncio
     async def test_get_text_only_end_line(self, server, temp_file):
@@ -130,8 +130,8 @@ class TestTextEditorServer:
         result = await get_text_fn(None, 2)
 
         assert "Line 1\nLine 2\n" == result["text"]
-        expected_hash = calculate_hash("Line 1\nLine 2\n", 1, 2)
-        assert expected_hash == result["lines_hash"]
+        expected_id = calculate_id("Line 1\nLine 2\n", 1, 2)
+        assert expected_id == result["id"]
 
     @pytest.mark.asyncio
     async def test_get_text_invalid_range(self, server, temp_file):
@@ -160,17 +160,17 @@ class TestTextEditorServer:
 
         assert "Line 3\nLine 4\nLine 5\n" == result["text"]
 
-    def test_calculate_hash_function(self):
-        """Test the calculate_hash function directly."""
+    def test_calculate_id_function(self):
+        """Test the calculate_id function directly."""
 
         text = "Some test content"
-        hash_no_range = calculate_hash(text)
+        id_no_range = calculate_id(text)
         expected = hashlib.sha256(text.encode()).hexdigest()[:2]
-        assert hash_no_range == expected
+        assert id_no_range == expected
 
-        hash_with_range = calculate_hash(text, 1, 3)
-        assert hash_with_range.startswith("L1-3-")
-        assert hash_with_range.endswith(expected)
+        id_with_range = calculate_id(text, 1, 3)
+        assert id_with_range.startswith("L1-3-")
+        assert id_with_range.endswith(expected)
 
     @pytest.mark.asyncio
     async def test_get_text_large_file(self, server):
@@ -190,7 +190,7 @@ class TestTextEditorServer:
 
             assert "text" in result
             assert (
-                f"len(selected_lines)={more_than_max_lines} > self.max_edit_lines={server.max_edit_lines} so no hash."
+                f"len(selected_lines)={more_than_max_lines} > self.max_edit_lines={server.max_edit_lines} so no id."
                 in result["info"]
             )
             assert len(result["text"].splitlines()) == more_than_max_lines
@@ -198,13 +198,13 @@ class TestTextEditorServer:
             result = await get_text_fn(5, 15)
 
             assert "text" in result
-            assert "lines_hash" in result
+            assert "id" in result
             assert len(result["text"].splitlines()) == 11
 
             result = await get_text_fn(5, server.max_edit_lines + 10)
 
             assert "text" in result
-            assert "lines_hash" not in result
+            assert "id" not in result
             assert len(result["text"].splitlines()) == server.max_edit_lines + 6
 
         finally:
@@ -223,7 +223,7 @@ class TestTextEditorServer:
         result = await new_file_fn(empty_temp_file, content)
 
         assert result["status"] == "success"
-        assert "lines_hash" in result
+        assert "id" in result
 
         with open(empty_temp_file, "r") as file:
             file_content = file.read()
@@ -307,11 +307,11 @@ class TestTextEditorServer:
         get_text_fn = self.get_tool_fn(server, "get_text")
         result = await get_text_fn(2, 2)
         line_content = result["text"]
-        line_hash = result["lines_hash"]
+        line_id = result["id"]
 
         insert_lines_fn = self.get_tool_fn(server, "insert_lines")
         new_text = "This is a new inserted line."
-        result = await insert_lines_fn(text=new_text, line=2, lines_hash=line_hash)
+        result = await insert_lines_fn(text=new_text, line=2, id=line_id)
 
         assert result["status"] == "success"
 
@@ -324,10 +324,10 @@ class TestTextEditorServer:
         assert "Line 3" in lines[3]
 
         result = await insert_lines_fn(
-            text="This should fail.", line=2, lines_hash="invalid-hash"
+            text="This should fail.", line=2, id="invalid-id"
         )
         assert "error" in result
-        assert "Hash verification failed" in result["error"]
+        assert "id verification failed" in result["error"]
 
     @pytest.mark.asyncio
     async def test_remove_lines(self, server, temp_file):
@@ -341,13 +341,13 @@ class TestTextEditorServer:
         initial_result = await get_text_fn()
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == initial_result["text"]
 
-        # Get hash for lines 2-4
+        # Get id for lines 2-4
         result = await get_text_fn(2, 4)
-        lines_hash = result["lines_hash"]
+        id = result["id"]
 
         # Remove lines 2-4
         remove_lines_fn = self.get_tool_fn(server, "remove_lines")
-        result = await remove_lines_fn(line_start=2, line_end=4, lines_hash=lines_hash)
+        result = await remove_lines_fn(line_start=2, line_end=4, id=id)
 
         assert result["status"] == "success"
         assert "Lines 2 to 4 removed" in result["message"]
@@ -359,15 +359,15 @@ class TestTextEditorServer:
         assert "Line 1" in lines[0]
         assert "Line 5" in lines[1]
 
-        # Test hash verification failure
+        # Test id verification failure
         result = await get_text_fn(1, 1)
-        line_hash = result["lines_hash"]
+        line_id = result["id"]
 
         result = await remove_lines_fn(
-            line_start=1, line_end=1, lines_hash="invalid-hash"
+            line_start=1, line_end=1, id="invalid-id"
         )
         assert "error" in result
-        assert "Hash verification failed" in result["error"]
+        assert "id verification failed" in result["error"]
 
     @pytest.mark.asyncio
     async def test_remove_lines_validation(self, server, temp_file):
@@ -380,7 +380,7 @@ class TestTextEditorServer:
 
         # Test no file set
         server.current_file_path = None
-        result = await remove_lines_fn(line_start=1, line_end=2, lines_hash="dummy")
+        result = await remove_lines_fn(line_start=1, line_end=2, id="dummy")
         assert "error" in result
         assert "No file path is set" in result["error"]
 
@@ -388,17 +388,17 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
 
         # Test line_start < 1
-        result = await remove_lines_fn(line_start=0, line_end=2, lines_hash="dummy")
+        result = await remove_lines_fn(line_start=0, line_end=2, id="dummy")
         assert "error" in result
         assert "line_start must be at least 1" in result["error"]
 
         # Test line_end > file length
-        result = await remove_lines_fn(line_start=1, line_end=10, lines_hash="dummy")
+        result = await remove_lines_fn(line_start=1, line_end=10, id="dummy")
         assert "error" in result
         assert "line_end (10) exceeds file length" in result["error"]
 
         # Test line_start > line_end
-        result = await remove_lines_fn(line_start=3, line_end=2, lines_hash="dummy")
+        result = await remove_lines_fn(line_start=3, line_end=2, id="dummy")
         assert "error" in result
         assert "line_start cannot be greater than line_end" in result["error"]
 
@@ -414,23 +414,23 @@ class TestTextEditorServer:
         initial_result = await get_text_fn()
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == initial_result["text"]
 
-        # Get hash for lines 2-4 that we want to replace
+        # Get id for lines 2-4 that we want to replace
         result = await get_text_fn(2, 4)
-        lines_hash = result["lines_hash"]
+        id = result["id"]
 
         # Step 1: Remove lines 2-4
         remove_lines_fn = self.get_tool_fn(server, "remove_lines")
-        result = await remove_lines_fn(line_start=2, line_end=4, lines_hash=lines_hash)
+        result = await remove_lines_fn(line_start=2, line_end=4, id=id)
         assert result["status"] == "success"
 
-        # Step 2: Get hash for the line before where we want to insert (now line 1)
+        # Step 2: Get id for the line before where we want to insert (now line 1)
         result = await get_text_fn(1, 1)
-        line_1_hash = result["lines_hash"]
+        line_1_id = result["id"]
 
         # Step 3: Insert new content after line 1
         insert_lines_fn = self.get_tool_fn(server, "insert_lines")
         new_text = "Completely new line 2.\nAnd new line 3.\nAnd new line 4."
-        result = await insert_lines_fn(text=new_text, line=1, lines_hash=line_1_hash)
+        result = await insert_lines_fn(text=new_text, line=1, id=line_1_id)
         assert result["status"] == "success"
 
         # Verify final content
@@ -474,7 +474,7 @@ class TestTextEditorServer:
         # Verify structure of the matches
         for match in result["matches"]:
             assert "line_number" in match
-            assert "lines_hash" in match
+            assert "id" in match
             assert "text" in match
             assert f"Line {match['line_number']}" in match["text"]
             

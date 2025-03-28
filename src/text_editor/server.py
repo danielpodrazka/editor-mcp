@@ -5,15 +5,15 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
 
-def calculate_hash(text: str, line_start: int = None, line_end: int = None) -> str:
+def calculate_id(text: str, line_start: int = None, line_end: int = None) -> str:
     """
     Args:
-        text (str): Content to hash
+        text (str): Content to id
         line_start (Optional[int]): Starting line number
         line_end (Optional[int]): Ending line number
 
     Returns:
-        str: Hex digest of SHA-256 hash
+        str: Hex digest of SHA-256 id
     """
     prefix = ""
     if line_start and line_end:
@@ -35,12 +35,12 @@ class TextEditorServer:
     - Creating new files
     - Deleting files
 
-    The server uses hashing to ensure file content integrity during editing operations.
+    The server uses iding to ensure file content integrity during editing operations.
     It registers all tools with FastMCP for remote procedure calling.
 
     Attributes:
         mcp (FastMCP): The MCP server instance for handling tool registrations
-        max_edit_lines (int): Maximum number of lines that can be edited with hash verification
+        max_edit_lines (int): Maximum number of lines that can be edited with id verification
         current_file_path (str, optional): Path to the currently active file
     """
 
@@ -76,14 +76,14 @@ class TextEditorServer:
             line_end: Optional[int] = None,
         ) -> Dict[str, Any]:
             """
-            Read text from the current file. Use to get lines_hash for the editing.
+            Read text from the current file. Use to get id for the editing.
 
             Args:
                 line_start (int, optional): Start line number (1-based indexing). If omitted but line_end is provided, starts at line 1.
                 line_end (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
 
             Returns:
-                dict: Dictionary containing the text with each line, and lines range hash if file has <= self.max_edit_lines lines
+                dict: Dictionary containing the text with each line, and lines range id if file has <= self.max_edit_lines lines
             """
             result = {}
 
@@ -111,12 +111,10 @@ class TextEditorServer:
                 result["text"] = text
                 if len(selected_lines) <= self.max_edit_lines:
                     original_text = "".join(selected_lines)
-                    result["lines_hash"] = calculate_hash(
-                        original_text, line_start, line_end
-                    )
+                    result["id"] = calculate_id(original_text, line_start, line_end)
                 else:
                     result["info"] = (
-                        f"{len(selected_lines)=} > {self.max_edit_lines=} so no hash."
+                        f"{len(selected_lines)=} > {self.max_edit_lines=} so no id."
                     )
                 return result
 
@@ -125,7 +123,7 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def insert_lines(
-            lines_hash: str,
+            id: str,
             line: int,
             text: str,
         ) -> Dict[str, Any]:
@@ -134,7 +132,7 @@ class TextEditorServer:
             Please don't insert more than 50 lines at a time to prevent hitting limits.
 
             Args:
-                lines_hash (str): Hash of the line at the specified line number
+                id (str): id of the line at the specified line number
                 line (int): Line number (1-based) after which to insert text
                 text (str): Text to insert.
 
@@ -143,7 +141,7 @@ class TextEditorServer:
 
             Notes:
                 - This tool is the preferred way to add new content into a file
-                - The hash verification ensures the file hasn't changed since you last read it
+                - The id verification ensures the file hasn't changed since you last read it
                 - The text will be inserted immediately after the specified line
                 - Use together with remove_lines to replace content
             """
@@ -162,11 +160,11 @@ class TextEditorServer:
                 }
 
             line_content = lines[line - 1]
-            computed_hash = calculate_hash(line_content, line, line)
+            computed_id = calculate_id(line_content, line, line)
 
-            if computed_hash != lines_hash:
+            if computed_id != id:
                 return {
-                    "error": "Hash verification failed. The line may have been modified since you last read it."
+                    "error": "id verification failed. The line may have been modified since you last read it."
                 }
 
             lines.insert(line, text if text.endswith("\n") else text + "\n")
@@ -185,7 +183,7 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def remove_lines(
-            lines_hash: str,
+            id: str,
             line_start: int,
             line_end: int,
         ) -> Dict[str, Any]:
@@ -195,13 +193,13 @@ class TextEditorServer:
             Args:
                 line_start (int): Start line number (1-based)
                 line_end (int): End line number (1-based)
-                lines_hash (str): Hash of the lines in the specified range
+                id (str): id of the lines in the specified range
 
             Returns:
                 dict: Operation result with status and message
 
             Notes:
-                - The hash verification ensures the file content hasn't changed since you last read it
+                - The id verification ensures the file content hasn't changed since you last read it
                 - Use together with insert_lines to replace content
             """
             if self.current_file_path is None:
@@ -225,11 +223,11 @@ class TextEditorServer:
                 return {"error": "line_start cannot be greater than line_end."}
 
             current_content = "".join(lines[line_start - 1 : line_end])
-            computed_hash = calculate_hash(current_content, line_start, line_end)
+            computed_id = calculate_id(current_content, line_start, line_end)
 
-            if computed_hash != lines_hash:
+            if computed_id != id:
                 return {
-                    "error": "Hash verification failed. The content may have been modified since you last read it."
+                    "error": "id verification failed. The content may have been modified since you last read it."
                 }
 
             before = lines[: line_start - 1]
@@ -294,7 +292,7 @@ class TextEditorServer:
                 text (str): Content to write to the new file
 
             Returns:
-                dict: Operation result with status and hash of the content if applicable
+                dict: Operation result with status and id of the content if applicable
 
             Notes:
                 - This tool will fail if the current file exists and is not empty.
@@ -319,7 +317,7 @@ class TextEditorServer:
                     "message": "File created successfully",
                 }
                 if len(text.splitlines()) <= self.max_edit_lines:
-                    result["lines_hash"] = calculate_hash(text)
+                    result["id"] = calculate_id(text)
 
                 return result
             except Exception as e:
@@ -331,38 +329,34 @@ class TextEditorServer:
         ) -> Dict[str, Any]:
             """
             Find lines that match provided text in the current file.
-            
+
             Args:
                 search_text (str): Text to search for in the file
-                
+
             Returns:
-                dict: Dictionary containing matching lines with their line numbers, lines_hash, and full text
+                dict: Dictionary containing matching lines with their line numbers, id, and full text
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
-                
+
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
-                
+
                 matches = []
                 for i, line in enumerate(lines, start=1):
                     if search_text in line:
-                        line_hash = calculate_hash(line, i, i)
-                        matches.append({
-                            "line_number": i,
-                            "lines_hash": line_hash,
-                            "text": line
-                        })
-                
+                        line_id = calculate_id(line, i, i)
+                        matches.append({"line_number": i, "id": line_id, "text": line})
+
                 result = {
                     "status": "success",
                     "matches": matches,
-                    "total_matches": len(matches)
+                    "total_matches": len(matches),
                 }
-                
+
                 return result
-                
+
             except Exception as e:
                 return {"error": f"Error searching file: {str(e)}"}
 
