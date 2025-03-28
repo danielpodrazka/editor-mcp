@@ -156,7 +156,12 @@ class TextEditorServer:
         ) -> Dict[str, Any]:
             """
             Overwrite a range of lines in the current file with new text.
-            Small ranges like 10-20 lines are better to prevent hitting limits.
+
+            Take a modular approach:
+            * Overwrite individual lines for smallest changes
+            * Overwrite section of a function for bigger changes
+            * Overwrite a function for biggest changes
+            Never overwrite the whole files. Aim to keep the code working between the changes
 
             Args:
                 text (str): New text to replace the specified range
@@ -263,8 +268,7 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def new_file(
-            absolute_file_path: str,
-            text: str,
+            absolute_file_path: str, text: str, overwriting_existing_file: bool = False
         ) -> Dict[str, Any]:
             """
             Create a new file with the provided content.
@@ -275,7 +279,7 @@ class TextEditorServer:
             Args:
                 absolute_file_path (str): Path of the new file
                 text (str): Content to write to the new file
-
+                overwriting_existing_file (bool): You can't overwrite files, so if you try to, the tool will fail.
             Returns:
                 dict: Operation result with status and id of the content if applicable
 
@@ -283,6 +287,10 @@ class TextEditorServer:
                 - This tool will fail if the current file exists and is not empty.
                 - Use set_file first to specify the file path.
             """
+            if overwriting_existing_file:
+                return {
+                    "error": "Overwriting is not allowed. Please edit file in chunks."
+                }
             self.current_file_path = absolute_file_path
 
             if (
