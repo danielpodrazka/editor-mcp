@@ -5,21 +5,21 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
 
-def calculate_id(text: str, line_start: int = None, line_end: int = None) -> str:
+def calculate_id(text: str, start: int = None, end: int = None) -> str:
     """
     Args:
         text (str): Content to id
-        line_start (Optional[int]): Starting line number
-        line_end (Optional[int]): Ending line number
+        start (Optional[int]): Starting line number
+        end (Optional[int]): Ending line number
 
     Returns:
         str: Hex digest of SHA-256 id
     """
     prefix = ""
-    if line_start and line_end:
-        prefix = f"L{line_start}-{line_end}-"
-        if line_start == line_end:
-            prefix = f"L{line_start}-"
+    if start and end:
+        prefix = f"L{start}-{end}-"
+        if start == end:
+            prefix = f"L{start}-"
 
     return f"{prefix}{hashlib.sha256(text.encode()).hexdigest()[:2]}"
 
@@ -72,15 +72,15 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def read(
-            line_start: Optional[int] = None,
-            line_end: Optional[int] = None,
+            start: Optional[int] = None,
+            end: Optional[int] = None,
         ) -> Dict[str, Any]:
             """
             Read text from the current file. Use to get id for the editing.
 
             Args:
-                line_start (int, optional): Start line number (1-based indexing). If omitted but line_end is provided, starts at line 1.
-                line_end (int, optional): End line number (1-based indexing). If omitted but line_start is provided, goes to the end of the file.
+                start (int, optional): Start line number (1-based indexing). If omitted but end is provided, starts at line 1.
+                end (int, optional): End line number (1-based indexing). If omitted but start is provided, goes to the end of the file.
 
             Returns:
                 dict: Dictionary containing the text with each line, and lines range id if file has <= self.max_edit_lines lines
@@ -94,24 +94,24 @@ class TextEditorServer:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
 
-                if line_start is None:
-                    line_start = 1
-                if line_end is None:
-                    line_end = len(lines)
-                if line_start < 1:
-                    return {"error": "line_start must be at least 1"}
-                if line_end > len(lines):
-                    line_end = len(lines)
-                if line_start > line_end:
-                    return {"error": "line_start cannot be greater than line_end"}
+                if start is None:
+                    start = 1
+                if end is None:
+                    end = len(lines)
+                if start < 1:
+                    return {"error": "start must be at least 1"}
+                if end > len(lines):
+                    end = len(lines)
+                if start > end:
+                    return {"error": "start cannot be greater than end"}
 
-                selected_lines = lines[line_start - 1 : line_end]
+                selected_lines = lines[start - 1 : end]
 
                 text = "".join(selected_lines)
                 result["text"] = text
                 if len(selected_lines) <= self.max_edit_lines:
                     original_text = "".join(selected_lines)
-                    result["id"] = calculate_id(original_text, line_start, line_end)
+                    result["id"] = calculate_id(original_text, start, end)
                 else:
                     result["info"] = (
                         f"{len(selected_lines)=} > {self.max_edit_lines=} so no id."
@@ -184,15 +184,15 @@ class TextEditorServer:
         @self.mcp.tool()
         async def remove_lines(
             id: str,
-            line_start: int,
-            line_end: int,
+            start: int,
+            end: int,
         ) -> Dict[str, Any]:
             """
             Remove a range of lines from the current file.
 
             Args:
-                line_start (int): Start line number (1-based)
-                line_end (int): End line number (1-based)
+                start (int): Start line number (1-based)
+                end (int): End line number (1-based)
                 id (str): id of the lines in the specified range
 
             Returns:
@@ -211,27 +211,27 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
 
-            if line_start < 1:
-                return {"error": "line_start must be at least 1."}
+            if start < 1:
+                return {"error": "start must be at least 1."}
 
-            if line_end > len(lines):
+            if end > len(lines):
                 return {
-                    "error": f"line_end ({line_end}) exceeds file length ({len(lines)})."
+                    "error": f"end ({end}) exceeds file length ({len(lines)})."
                 }
 
-            if line_start > line_end:
-                return {"error": "line_start cannot be greater than line_end."}
+            if start > end:
+                return {"error": "start cannot be greater than end."}
 
-            current_content = "".join(lines[line_start - 1 : line_end])
-            computed_id = calculate_id(current_content, line_start, line_end)
+            current_content = "".join(lines[start - 1 : end])
+            computed_id = calculate_id(current_content, start, end)
 
             if computed_id != id:
                 return {
                     "error": "id verification failed. The content may have been modified since you last read it."
                 }
 
-            before = lines[: line_start - 1]
-            after = lines[line_end:]
+            before = lines[: start - 1]
+            after = lines[end:]
             modified_lines = before + after
 
             try:
@@ -240,7 +240,7 @@ class TextEditorServer:
 
                 result = {
                     "status": "success",
-                    "message": f"Lines {line_start} to {line_end} removed",
+                    "message": f"Lines {start} to {end} removed",
                 }
 
                 return result

@@ -143,11 +143,11 @@ class TestTextEditorServer:
 
         result = await read_fn(4, 2)
         assert "error" in result
-        assert "line_start cannot be greater than line_end" in result["error"]
+        assert "start cannot be greater than end" in result["error"]
 
         result = await read_fn(0, 3)
         assert "error" in result
-        assert "line_start must be at least 1" in result["error"]
+        assert "start must be at least 1" in result["error"]
 
     @pytest.mark.asyncio
     async def test_read_range_exceeding_file(self, server, temp_file):
@@ -347,7 +347,7 @@ class TestTextEditorServer:
 
         # Remove lines 2-4
         remove_lines_fn = self.get_tool_fn(server, "remove_lines")
-        result = await remove_lines_fn(line_start=2, line_end=4, id=id)
+        result = await remove_lines_fn(start=2, end=4, id=id)
 
         assert result["status"] == "success"
         assert "Lines 2 to 4 removed" in result["message"]
@@ -363,7 +363,7 @@ class TestTextEditorServer:
         result = await read_fn(1, 1)
         line_id = result["id"]
 
-        result = await remove_lines_fn(line_start=1, line_end=1, id="invalid-id")
+        result = await remove_lines_fn(start=1, end=1, id="invalid-id")
         assert "error" in result
         assert "id verification failed" in result["error"]
 
@@ -378,27 +378,27 @@ class TestTextEditorServer:
 
         # Test no file set
         server.current_file_path = None
-        result = await remove_lines_fn(line_start=1, line_end=2, id="dummy")
+        result = await remove_lines_fn(start=1, end=2, id="dummy")
         assert "error" in result
         assert "No file path is set" in result["error"]
 
         # Reset file path
         await set_file_fn(temp_file)
 
-        # Test line_start < 1
-        result = await remove_lines_fn(line_start=0, line_end=2, id="dummy")
+        # Test start < 1
+        result = await remove_lines_fn(start=0, end=2, id="dummy")
         assert "error" in result
-        assert "line_start must be at least 1" in result["error"]
+        assert "start must be at least 1" in result["error"]
 
-        # Test line_end > file length
-        result = await remove_lines_fn(line_start=1, line_end=10, id="dummy")
+        # Test end > file length
+        result = await remove_lines_fn(start=1, end=10, id="dummy")
         assert "error" in result
-        assert "line_end (10) exceeds file length" in result["error"]
+        assert "end (10) exceeds file length" in result["error"]
 
-        # Test line_start > line_end
-        result = await remove_lines_fn(line_start=3, line_end=2, id="dummy")
+        # Test start > end
+        result = await remove_lines_fn(start=3, end=2, id="dummy")
         assert "error" in result
-        assert "line_start cannot be greater than line_end" in result["error"]
+        assert "start cannot be greater than end" in result["error"]
 
     @pytest.mark.asyncio
     async def test_replace_text_with_remove_and_insert(self, server, temp_file):
@@ -418,7 +418,7 @@ class TestTextEditorServer:
 
         # Step 1: Remove lines 2-4
         remove_lines_fn = self.get_tool_fn(server, "remove_lines")
-        result = await remove_lines_fn(line_start=2, line_end=4, id=id)
+        result = await remove_lines_fn(start=2, end=4, id=id)
         assert result["status"] == "success"
 
         # Step 2: Get id for the line before where we want to insert (now line 1)
