@@ -12,6 +12,7 @@ A Python-based text editor server built with FastMCP that provides tools for fil
   - Create new files with content
 - **File Deletion**: Remove files from the filesystem
 - **Hash Verification**: Ensures data integrity during editing operations
+- **Search Operations**: Find lines containing specific text
 
 ## Installation
 
@@ -110,6 +111,34 @@ Create a new file with the provided content.
 **Note**:
 - This tool will fail if the current file exists and is not empty
 
+#### 7. `find_line`
+Find lines that match provided text in the current file.
+
+**Parameters**:
+- `search_text` (str): Text to search for in the file
+
+**Returns**:
+- Dictionary containing matching lines with their line numbers, lines_hash, and full text
+
+**Example output**:
+```
+{
+  "status": "success",
+  "matches": [
+    {
+      "line_number": 2,
+      "lines_hash": "L2-a1b2c3",
+      "text": "    print(\"Hello, world!\")\n"
+    }
+  ],
+  "total_matches": 1
+}
+```
+
+**Note**:
+- Returns an error if no file path is set
+- Searches for exact text matches within each line
+- The lines_hash can be used for subsequent edit operations
 ## Configuration
 
 Environment variables:
@@ -167,6 +196,13 @@ The test suite covers:
    - File creation validation
    - Handling existing files
 
+7. **find_line tool**
+   - Finding text matches in files
+   - Handling specific search terms
+   - Error handling for non-existent files
+   - Handling cases with no matches
+   - Handling existing files
+
 ## How it Works
 
 The server uses FastMCP to expose text editing capabilities through a well-defined API. The hash verification system ensures data integrity by verifying that the content hasn't changed between reading and modifying operations.
@@ -180,13 +216,14 @@ The main `TextEditorServer` class:
 1. Initializes with a FastMCP instance named "text-editor"
 2. Sets a configurable `max_edit_lines` limit (default: 200) from environment variables
 3. Maintains the current file path as state
-4. Registers six primary tools through FastMCP:
+4. Registers seven primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
    - `get_text`: Reads content with line numbering and hash generation
    - `insert_lines`: Inserts text after a specific line
    - `remove_lines`: Removes a range of lines
    - `delete_file`: Deletes the current file
    - `new_file`: Creates a new file with content
+   - `find_line`: Finds lines containing specific text
 
 The server runs using FastMCP's stdio transport by default, making it easy to integrate with various clients.
 
