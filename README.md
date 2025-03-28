@@ -7,12 +7,10 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 - **File Selection**: Set a file to work with using absolute paths
 - **Read Operations**: Read entire files or specific line ranges
 - **Edit Operations**: 
-  - Insert lines after a specific line
-  - Remove lines within a line range
+  - Overwrite text in a specified line range
   - Create new files with content
 - **File Deletion**: Remove files from the filesystem
 - **Search Operations**: Find lines containing specific text
-
 ## Installation
 
 ```bash
@@ -43,13 +41,23 @@ Sets the current file to work with.
 **Returns**:
 - Confirmation message with the file path
 
+#### 2. `skim`
+Reads full text from the current file.
 
-#### 2. `read`
-Reads text from the current file. Use to get id for the editing.
+**Returns**:
+- Dictionary containing the complete text of the file
+
+**Example output**:
+```
+{"text": "def hello():\n    print(\"Hello, world!\")\n\nhello()"}
+```
+
+#### 3. `read`
+Reads text from the current file and gets its ID for editing operations.
 
 **Parameters**:
-- `start` (int, optional): Start line number (1-based indexing). If omitted but end is provided, starts at line 1.
-- `end` (int, optional): End line number (1-based indexing). If omitted but start is provided, goes to the end of the file.
+- `start` (int): Start line number (1-based indexing)
+- `end` (int): End line number (1-based indexing)
 
 **Returns**:
 - Dictionary containing the text and lines range id if file has <= MAX_EDIT_LINES lines
@@ -59,34 +67,24 @@ Reads text from the current file. Use to get id for the editing.
 {"text": "def hello():\n    print(\"Hello, world!\")\n\nhello()", "id": "L1-4-a1b2c3"}
 ```
 
+#### 4. `overwrite`
+Overwrite a range of lines in the current file with new text.
 
 **Parameters**:
-- `line` (int): Line number (1-based) after which to insert text
-- `text` (str): Text to insert
-
-**Returns**:
-- Operation result with status
-
-**Note**:
-- This tool is the preferred way to add new content into a file
-- The hash verification ensures the file hasn't changed since you last read it
-- The text will be inserted immediately after the specified line
-- Use together with remove_lines to replace content
-- Don't insert more than 50 lines at a time to prevent hitting limits
-
-Remove a range of lines from the current file.
-
-**Parameters**:
-- `line_start` (int): Start line number (1-based)
-- `line_end` (int): End line number (1-based)
-- `lines_hash` (str): Hash of the lines in the specified range
+- `text` (str): New text to replace the specified range
+- `start` (int): Start line number (1-based)
+- `end` (int): End line number (1-based)
+- `id` (str): ID of the lines in the specified range
 
 **Returns**:
 - Operation result with status and message
 
 **Note**:
-- The hash verification ensures the file content hasn't changed since you last read it
-- Use together with insert_lines to replace content
+- This tool allows replacing a range of lines with new content
+- The number of new lines can differ from the original range
+- To remove lines, provide an empty string as the text parameter
+- The behavior mimics copy-paste: original lines are removed, new lines are inserted at that position
+- Small ranges like 10-20 lines are better to prevent hitting limits
 
 #### 5. `delete_file`
 Delete the currently set file.
@@ -102,7 +100,7 @@ Create a new file with the provided content.
 - `text` (str): Content to write to the new file
 
 **Returns**:
-- Operation result with status and hash of the content if applicable
+- Operation result with status and id of the content if applicable
 
 **Note**:
 - This tool will fail if the current file exists and is not empty
@@ -114,7 +112,7 @@ Find lines that match provided text in the current file.
 - `search_text` (str): Text to search for in the file
 
 **Returns**:
-- Dictionary containing matching lines with their line numbers, lines_hash, and full text
+- Dictionary containing matching lines with their line numbers, id, and full text
 
 **Example output**:
 ```
@@ -175,34 +173,30 @@ The test suite covers:
    - Edge cases like empty files
    - Invalid range handling
 
-3. **insert tool**
-   - Line validation
-   - ID verification
-   - Content insertion validation
-   
-4. **remove tool**
+3. **overwrite tool**
    - Line range validation
    - ID verification
-   - Content removal validation
-
-5. **delete_file tool**
+   - Content replacement validation
+   
+4. **delete_file tool**
    - File deletion validation
 
-6. **new_file tool**
+5. **new_file tool**
    - File creation validation
    - Handling existing files
 
-7. **find_line tool**
+6. **find_line tool**
    - Finding text matches in files
    - Handling specific search terms
    - Error handling for non-existent files
    - Handling cases with no matches
    - Handling existing files
+## How it Works
+
 
 ## How it Works
 
 The server uses FastMCP to expose text editing capabilities through a well-defined API. The ID verification system ensures data integrity by verifying that the content hasn't changed between reading and modifying operations.
-
 The ID mechanism uses SHA-256 to generate a unique identifier of the file content or selected line ranges. For line-specific operations, the ID includes a prefix indicating the line range (e.g., "L10-15-[hash]"). This helps ensure that edits are being applied to the expected content.
 
 ## Implementation Details
@@ -214,9 +208,9 @@ The main `TextEditorServer` class:
 3. Maintains the current file path as state
 4. Registers seven primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
+   - `skim`: Reads the entire content of a file
    - `read`: Reads content and generates content IDs
-   - `insert`: Inserts text after a specific line
-   - `remove`: Removes a range of lines
+   - `overwrite`: Replaces text in a specified line range
    - `delete_file`: Deletes the current file
    - `new_file`: Creates a new file with content
    - `find_line`: Finds lines containing specific text

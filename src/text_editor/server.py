@@ -156,6 +156,7 @@ class TextEditorServer:
         ) -> Dict[str, Any]:
             """
             Overwrite a range of lines in the current file with new text.
+            Small ranges like 10-20 lines are better to prevent hitting limits.
 
             Args:
                 text (str): New text to replace the specified range
