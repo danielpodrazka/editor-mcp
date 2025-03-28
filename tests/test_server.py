@@ -231,156 +231,6 @@ class TestTextEditorServer:
         assert "error" in result
 
     @pytest.mark.asyncio
-    async def test_edit_text_insert_mode(self, server, temp_file):
-        """Test edit_text in insert mode."""
-
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(temp_file)
-
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 2)
-        line_content = result["text"]
-        line_hash = result["lines_hash"]
-
-        edit_text_fn = self.get_tool_fn(server, "edit_text")
-        new_text = "This is a new inserted line."
-        result = await edit_text_fn("insert", new_text, line=2, lines_hash=line_hash)
-
-        assert result["status"] == "success"
-        assert "new_line_hash" in result
-
-        result = await get_text_fn()
-        assert new_text in result["text"]
-
-        lines = result["text"].splitlines()
-        assert "Line 2" in lines[1]
-        assert new_text in lines[2]
-        assert "Line 3" in lines[3]
-
-        result = await edit_text_fn(
-            "insert", "This should fail.", line=2, lines_hash="invalid-hash"
-        )
-        assert "error" in result
-        assert "Hash verification failed" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_edit_text_overwrite_mode(self, server, temp_file):
-        """Test edit_text in overwrite mode."""
-
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(temp_file)
-
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 4)
-        line_content = result["text"]
-        lines_hash = result["lines_hash"]
-
-        edit_text_fn = self.get_tool_fn(server, "edit_text")
-        new_text = "Completely new line 2.\nAnd new line 3.\nAnd new line 4."
-        result = await edit_text_fn(
-            "overwrite", new_text, line_start=2, line_end=4, lines_hash=lines_hash
-        )
-
-        assert result["status"] == "success"
-
-        result = await get_text_fn()
-        lines = result["text"].splitlines()
-
-        assert "Line 1" in lines[0]
-        assert "Completely new line 2" in lines[1]
-        assert "And new line 3" in lines[2]
-        assert "And new line 4" in lines[3]
-        assert "Line 5" in lines[4]
-
-        result = await edit_text_fn(
-            "overwrite",
-            "This should fail.",
-            line_start=2,
-            line_end=4,
-            lines_hash="invalid-hash",
-        )
-        assert "error" in result
-        assert "Hash verification failed" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_edit_text_validation(self, server, temp_file):
-        """Test validation in edit_text."""
-
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(temp_file)
-
-        edit_text_fn = self.get_tool_fn(server, "edit_text")
-
-        result = await edit_text_fn("invalid_mode", "text")
-        assert "error" in result
-        assert "Invalid mode" in result["error"]
-
-        result = await edit_text_fn("insert", "text", lines_hash="hash")
-        assert "error" in result
-        assert "requires a line number" in result["error"]
-
-        result = await edit_text_fn("insert", "text", line=2)
-        assert "error" in result
-        assert "requires a lines_hash" in result["error"]
-
-        result = await edit_text_fn("insert", "text", line=100, lines_hash="hash")
-        assert "error" in result
-        assert "Invalid line number" in result["error"]
-
-        result = await edit_text_fn("overwrite", "text", lines_hash="hash")
-        assert "error" in result
-        assert "requires both line_start and line_end" in result["error"]
-
-        result = await edit_text_fn("overwrite", "text", line_start=2, line_end=4)
-        assert "error" in result
-        assert "requires a lines_hash" in result["error"]
-
-        result = await edit_text_fn(
-            "overwrite", "text", line_start=4, line_end=2, lines_hash="hash"
-        )
-        assert "error" in result
-        assert "line_start cannot be greater than line_end" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_edit_text_large_content(self, server, empty_temp_file):
-        """Test edit_text with content exceeding 50 lines."""
-
-        set_file_fn = self.get_tool_fn(server, "set_file")
-        await set_file_fn(empty_temp_file)
-        edit_text_fn = self.get_tool_fn(server, "edit_text")
-        new_file_fn = self.get_tool_fn(server, "new_file")
-        large_content = "\n".join([f"Line {i}" for i in range(1, 60)])
-        result = await new_file_fn(empty_temp_file, large_content)
-
-        assert result["status"] == "success"
-        assert "lines_hash" not in result
-
-        get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(3, 3)
-        line_hash = result["lines_hash"]
-
-        result = await edit_text_fn(
-            "insert", "New inserted line", line=3, lines_hash=line_hash
-        )
-        assert result["status"] == "success"
-        assert "new_line_hash" in result
-
-        result = await get_text_fn(10, 20)
-        line_hash = result["lines_hash"]
-
-        large_replacement = "\n".join([f"New line {i}" for i in range(1, 60)])
-        result = await edit_text_fn(
-            "overwrite",
-            large_replacement,
-            line_start=10,
-            line_end=20,
-            lines_hash=line_hash,
-        )
-
-        assert result["status"] == "success"
-        assert "lines_hash" not in result
-
-    @pytest.mark.asyncio
     async def test_delete_current_file(self, server):
         """Test delete_current_file tool."""
 
@@ -444,3 +294,111 @@ class TestTextEditorServer:
             monkeypatch.undo()
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_insert_lines(self, server, temp_file):
+        """Test insert_lines functionality."""
+
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        get_text_fn = self.get_tool_fn(server, "get_text")
+        result = await get_text_fn(2, 2)
+        line_content = result["text"]
+        line_hash = result["lines_hash"]
+
+        insert_lines_fn = self.get_tool_fn(server, "insert_lines")
+        new_text = "This is a new inserted line."
+        result = await insert_lines_fn(new_text, line=2, lines_hash=line_hash)
+
+        assert result["status"] == "success"
+        assert "new_line_hash" in result
+
+        result = await get_text_fn()
+        assert new_text in result["text"]
+
+        lines = result["text"].splitlines()
+        assert "Line 2" in lines[1]
+        assert new_text in lines[2]
+        assert "Line 3" in lines[3]
+
+        result = await insert_lines_fn(
+            "This should fail.", line=2, lines_hash="invalid-hash"
+        )
+        assert "error" in result
+        assert "Hash verification failed" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_text(self, server, temp_file):
+        """Test overwrite_text functionality."""
+
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        get_text_fn = self.get_tool_fn(server, "get_text")
+        result = await get_text_fn(2, 4)
+        line_content = result["text"]
+        lines_hash = result["lines_hash"]
+
+        overwrite_text_fn = self.get_tool_fn(server, "overwrite_text")
+        new_text = "Completely new line 2.\nAnd new line 3.\nAnd new line 4."
+        result = await overwrite_text_fn(
+            new_text, line_start=2, line_end=4, lines_hash=lines_hash
+        )
+
+        assert result["status"] == "success"
+
+        result = await get_text_fn()
+        lines = result["text"].splitlines()
+
+        assert "Line 1" in lines[0]
+        assert "Completely new line 2" in lines[1]
+        assert "And new line 3" in lines[2]
+        assert "And new line 4" in lines[3]
+        assert "Line 5" in lines[4]
+
+        result = await overwrite_text_fn(
+            "This should fail.",
+            line_start=2,
+            line_end=4,
+            lines_hash="invalid-hash",
+        )
+        assert "error" in result
+        assert "Hash verification failed" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_text_max_lines_limit(self, server):
+        """Test overwrite_text with attempt to overwrite more than 200 lines."""
+
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
+            for i in range(300):
+                f.write(f"Line {i + 1}\n")
+            large_file_path = f.name
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(large_file_path)
+
+            get_text_fn = self.get_tool_fn(server, "get_text")
+            result = await get_text_fn(1, 50)
+            lines_hash = result["lines_hash"]
+            more_lines_than_max = server.max_edit_lines + 1
+            overwrite_text_fn = self.get_tool_fn(server, "overwrite_text")
+            result = await overwrite_text_fn(
+                "Test content",
+                line_start=1,
+                line_end=more_lines_than_max,
+                lines_hash="dummy-hash",
+            )
+
+            assert "error" in result
+            assert (
+                f"Cannot overwrite more than 50 lines at once (attempted {more_lines_than_max} lines)."
+                in result["error"]
+            )
+
+            result = await get_text_fn(1, server.max_edit_lines)
+
+        finally:
+            if os.path.exists(large_file_path):
+                os.unlink(large_file_path)

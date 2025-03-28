@@ -29,7 +29,7 @@ class TextEditorServer:
     This class provides a set of tools for interacting with text files, including:
     - Setting the current file to work with
     - Reading text content from files
-    - Editing file content through insert and overwrite modes
+    - Editing file content through separate tools for inserting and overwriting text
     - Creating new files
     - Deleting files
 
@@ -133,145 +133,152 @@ class TextEditorServer:
                 return {"error": f"Error reading file: {str(e)}"}
 
         @self.mcp.tool()
-        async def edit_text(
-            mode: str,
+        async def insert_lines(
             text: str,
-            line: Optional[int] = None,
-            line_start: Optional[int] = None,
-            line_end: Optional[int] = None,
-            lines_hash: Optional[str] = None,
+            line: int,
+            lines_hash: str,
         ) -> Dict[str, Any]:
             """
-            Edit text in the current file using insert or overwrite modes.
+            Insert lines of text after a specific line in the current file.
 
             Args:
-                mode (str): Edit mode - 'insert' or 'overwrite'
-                text (str): Text to insert or overwrite
-                line (int, optional): Line number for insert mode (1-based)
-                line_start (int, optional): Start line for overwrite mode (1-based)
-                line_end (int, optional): End line for overwrite mode (1-based)
-                lines_hash (str, optional): Hash of line(s) being modified (required for insert and overwrite)
+                text (str): Text to insert
+                line (int): Line number (1-based) after which to insert text
+                lines_hash (str): Hash of the line at the specified line number
 
             Returns:
                 dict: Operation result with status and new hash if applicable
 
             Notes:
-                - In overwrite mode, the number of new lines can differ from the original range.
-                  For example, you can replace 2 lines with 10 lines, or replace 10 lines with nothing (empty string).
-                - When replacing content with an empty string, the lines within the specified range will be removed.
-                - The behavior mimics copy-paste: original lines are removed, new lines are inserted at that position,
-                  and any content after the original section is preserved and will follow the new content.
+                - This is the preferred tool for inserting new content into a file
+                - The hash verification ensures the file hasn't changed since you last read it
+                - The text will be inserted immediately after the specified line
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
 
-            if mode not in ["insert", "overwrite"]:
-                return {
-                    "error": f"Invalid mode: '{mode}'. Must be 'insert' or 'overwrite'."
-                }
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
 
-            if mode == "insert":
-                if line is None:
-                    return {
-                        "error": "Insert mode requires a line number and it's hash below which you want to insert."
-                    }
+            if line < 1 or line > len(lines):
+                return {
+                    "error": f"Invalid line number: {line}. File has {len(lines)} lines."
+                }
 
-                if lines_hash is None:
-                    return {
-                        "error": "Insert mode requires a lines_hash of the line above the insert."
-                    }
+            line_content = lines[line - 1]
+            computed_hash = calculate_hash(line_content, line, line)
 
-                if line < 1 or line > len(lines):
-                    return {
-                        "error": f"Invalid line number: {line}. File has {len(lines)} lines."
-                    }
+            if computed_hash != lines_hash:
+                return {
+                    "error": "Hash verification failed. The line may have been modified since you last read it."
+                }
 
-                line_content = lines[line - 1]
-                computed_hash = calculate_hash(line_content, line, line)
+            lines.insert(line, text if text.endswith("\n") else text + "\n")
 
-                if computed_hash != lines_hash:
-                    return {
-                        "error": "Hash verification failed. The line may have been modified since you last read it."
-                    }
+            try:
+                with open(self.current_file_path, "w", encoding="utf-8") as file:
+                    file.writelines(lines)
 
-                lines.insert(line, text if text.endswith("\n") else text + "\n")
+                result = {
+                    "status": "success",
+                    "message": f"Text inserted after line {line}",
+                }
 
-                try:
-                    with open(self.current_file_path, "w", encoding="utf-8") as file:
-                        file.writelines(lines)
+                new_line_hash = calculate_hash(
+                    text if text.endswith("\n") else text + "\n", line + 1, line + 1
+                )
+                result["new_line_hash"] = new_line_hash
 
-                    result = {
-                        "status": "success",
-                        "message": f"Text inserted after line {line}",
-                    }
+                return result
+            except Exception as e:
+                return {"error": f"Error writing to file: {str(e)}"}
 
-                    new_line_hash = calculate_hash(
-                        text if text.endswith("\n") else text + "\n", line + 1, line + 1
-                    )
-                    result["new_line_hash"] = new_line_hash
+        @self.mcp.tool()
+        async def overwrite_text(
+            text: str,
+            line_start: int,
+            line_end: int,
+            lines_hash: str,
+        ) -> Dict[str, Any]:
+            """
+            Overwrite a range of lines in the current file with new text.
 
-                    return result
-                except Exception as e:
-                    return {"error": f"Error writing to file: {str(e)}"}
+            Args:
+                text (str): New text to replace the specified range
+                line_start (int): Start line number (1-based)
+                line_end (int): End line number (1-based)
+                lines_hash (str): Hash of the lines in the specified range
 
-            if mode == "overwrite":
-                if line_start is None or line_end is None:
-                    return {
-                        "error": "Overwrite mode requires both line_start and line_end."
-                    }
+            Returns:
+                dict: Operation result with status and message
 
-                if lines_hash is None:
-                    return {"error": "Overwrite mode requires a lines_hash."}
+            Notes:
+                - This tool allows replacing a range of lines with new content
+                - The number of new lines can differ from the original range
+                - To remove lines, provide an empty string as the text parameter
+                - The behavior mimics copy-paste: original lines are removed, new lines are
+                  inserted at that position, and any content after the original section
+                  is preserved and will follow the new content
+            """
+            if self.current_file_path is None:
+                return {"error": "No file path is set. Use set_file first."}
 
-                if line_start < 1:
-                    return {"error": "line_start must be at least 1."}
+            try:
+                with open(self.current_file_path, "r", encoding="utf-8") as file:
+                    lines = file.readlines()
+            except Exception as e:
+                return {"error": f"Error reading file: {str(e)}"}
 
-                if line_end > len(lines):
-                    return {
-                        "error": f"line_end ({line_end}) exceeds file length ({len(lines)})."
-                    }
+            if line_start < 1:
+                return {"error": "line_start must be at least 1."}
 
-                if line_start > line_end:
-                    return {"error": "line_start cannot be greater than line_end."}
+            if line_end > len(lines):
+                return {
+                    "error": f"line_end ({line_end}) exceeds file length ({len(lines)})."
+                }
 
-                current_content = "".join(lines[line_start - 1 : line_end])
+            if line_start > line_end:
+                return {"error": "line_start cannot be greater than line_end."}
 
-                computed_hash = calculate_hash(current_content, line_start, line_end)
+            if line_end - line_start + 1 > self.max_edit_lines:
+                return {
+                    "error": f"Cannot overwrite more than {self.max_edit_lines} lines at once (attempted {line_end - line_start + 1} lines)."
+                }
 
-                if computed_hash != lines_hash:
-                    return {
-                        "error": "Hash verification failed. The content may have been modified since you last read it."
-                    }
+            current_content = "".join(lines[line_start - 1 : line_end])
 
-                new_text = text
-                if not new_text.endswith("\n") and line_end < len(lines):
-                    new_text += "\n"
+            computed_hash = calculate_hash(current_content, line_start, line_end)
 
-                new_lines = new_text.splitlines(True)
+            if computed_hash != lines_hash:
+                return {
+                    "error": "Hash verification failed. The content may have been modified since you last read it."
+                }
 
-                before = lines[: line_start - 1]
-                after = lines[line_end:]
-                modified_lines = before + new_lines + after
+            new_text = text
+            if not new_text.endswith("\n") and line_end < len(lines):
+                new_text += "\n"
 
-                try:
-                    with open(self.current_file_path, "w", encoding="utf-8") as file:
-                        file.writelines(modified_lines)
+            new_lines = new_text.splitlines(True)
 
-                    result = {
-                        "status": "success",
-                        "message": f"Text overwritten from line {line_start} to {line_end}",
-                    }
+            before = lines[: line_start - 1]
+            after = lines[line_end:]
+            modified_lines = before + new_lines + after
 
-                    return result
-                except Exception as e:
-                    return {"error": f"Error writing to file: {str(e)}"}
+            try:
+                with open(self.current_file_path, "w", encoding="utf-8") as file:
+                    file.writelines(modified_lines)
 
-            return {"error": "Unknown error occurred."}
+                result = {
+                    "status": "success",
+                    "message": f"Text overwritten from line {line_start} to {line_end}",
+                }
+
+                return result
+            except Exception as e:
+                return {"error": f"Error writing to file: {str(e)}"}
 
         @self.mcp.tool()
         async def delete_current_file() -> Dict[str, Any]:
