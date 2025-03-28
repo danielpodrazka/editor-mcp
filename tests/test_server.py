@@ -11,7 +11,7 @@ class TestTextEditorServer:
     def server(self):
         """Create a TextEditorServer instance for testing."""
         server = TextEditorServer()
-        server.max_edit_lines = 50
+        server.max_edit_lines = 200
         return server
 
     @pytest.fixture
@@ -177,7 +177,7 @@ class TestTextEditorServer:
         """Test getting text from a file larger than MAX_EDIT_LINES lines."""
 
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
-            for i in range(60):
+            for i in range(server.max_edit_lines + 10):
                 f.write(f"Line {i + 1}\n")
             large_file_path = f.name
 
@@ -191,7 +191,7 @@ class TestTextEditorServer:
             assert "text" in result
             assert "lines_hash" not in result
             assert f"No line_start/line_end provided so no hash" in result["info"]
-            assert len(result["text"].splitlines()) == 60
+            assert len(result["text"].splitlines()) == server.max_edit_lines + 10
 
             result = await get_text_fn(5, 15)
 
@@ -199,11 +199,11 @@ class TestTextEditorServer:
             assert "lines_hash" in result
             assert len(result["text"].splitlines()) == 11
 
-            result = await get_text_fn(5, 60)
+            result = await get_text_fn(5, server.max_edit_lines + 10)
 
             assert "text" in result
             assert "lines_hash" not in result
-            assert len(result["text"].splitlines()) == 56
+            assert len(result["text"].splitlines()) == server.max_edit_lines + 6
 
         finally:
             if os.path.exists(large_file_path):
@@ -329,49 +329,88 @@ class TestTextEditorServer:
         assert "Hash verification failed" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_overwrite_text(self, server, temp_file):
-        """Test overwrite_text functionality."""
+    async def test_remove_lines(self, server, temp_file):
+        """Test remove_lines functionality."""
 
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
+        # First, read the entire file to verify initial state
         get_text_fn = self.get_tool_fn(server, "get_text")
-        result = await get_text_fn(2, 4)
-        line_content = result["text"]
-        lines_hash = result["lines_hash"]
-
-        overwrite_text_fn = self.get_tool_fn(server, "overwrite_text")
-        new_text = "Completely new line 2.\nAnd new line 3.\nAnd new line 4."
-        result = await overwrite_text_fn(
-            new_text, line_start=2, line_end=4, lines_hash=lines_hash
+        initial_result = await get_text_fn()
+        assert (
+            "1|Line 1\n2|Line 2\n3|Line 3\n4|Line 4\n5|Line 5\n"
+            == initial_result["text"]
         )
 
-        assert result["status"] == "success"
+        # Get hash for lines 2-4
+        result = await get_text_fn(2, 4)
+        lines_hash = result["lines_hash"]
 
+        # Remove lines 2-4
+        remove_lines_fn = self.get_tool_fn(server, "remove_lines")
+        result = await remove_lines_fn(line_start=2, line_end=4, lines_hash=lines_hash)
+
+        assert result["status"] == "success"
+        assert "Lines 2 to 4 removed" in result["message"]
+
+        # Verify the file now only has lines 1 and 5
         result = await get_text_fn()
         lines = result["text"].splitlines()
-
+        assert len(lines) == 2
         assert "Line 1" in lines[0]
-        assert "Completely new line 2" in lines[1]
-        assert "And new line 3" in lines[2]
-        assert "And new line 4" in lines[3]
-        assert "Line 5" in lines[4]
+        assert "Line 5" in lines[1]
 
-        result = await overwrite_text_fn(
-            "This should fail.",
-            line_start=2,
-            line_end=4,
-            lines_hash="invalid-hash",
+        # Test hash verification failure
+        result = await get_text_fn(1, 1)
+        line_hash = result["lines_hash"]
+
+        result = await remove_lines_fn(
+            line_start=1, line_end=1, lines_hash="invalid-hash"
         )
         assert "error" in result
         assert "Hash verification failed" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_overwrite_text_max_lines_limit(self, server):
-        """Test overwrite_text with attempt to overwrite more than 200 lines."""
+    async def test_remove_lines_validation(self, server, temp_file):
+        """Test remove_lines validation checks."""
 
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        remove_lines_fn = self.get_tool_fn(server, "remove_lines")
+
+        # Test no file set
+        server.current_file_path = None
+        result = await remove_lines_fn(line_start=1, line_end=2, lines_hash="dummy")
+        assert "error" in result
+        assert "No file path is set" in result["error"]
+
+        # Reset file path
+        await set_file_fn(temp_file)
+
+        # Test line_start < 1
+        result = await remove_lines_fn(line_start=0, line_end=2, lines_hash="dummy")
+        assert "error" in result
+        assert "line_start must be at least 1" in result["error"]
+
+        # Test line_end > file length
+        result = await remove_lines_fn(line_start=1, line_end=10, lines_hash="dummy")
+        assert "error" in result
+        assert "line_end (10) exceeds file length" in result["error"]
+
+        # Test line_start > line_end
+        result = await remove_lines_fn(line_start=3, line_end=2, lines_hash="dummy")
+        assert "error" in result
+        assert "line_start cannot be greater than line_end" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_remove_lines_max_limit(self, server):
+        """Test remove_lines with attempt to remove more than server.max_edit_lines lines."""
+
+        # Create a file with 250 lines
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
-            for i in range(300):
+            for i in range(server.max_edit_lines + 50):
                 f.write(f"Line {i + 1}\n")
             large_file_path = f.name
 
@@ -379,26 +418,80 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(large_file_path)
 
-            get_text_fn = self.get_tool_fn(server, "get_text")
-            result = await get_text_fn(1, 50)
-            lines_hash = result["lines_hash"]
-            more_lines_than_max = server.max_edit_lines + 1
-            overwrite_text_fn = self.get_tool_fn(server, "overwrite_text")
-            result = await overwrite_text_fn(
-                "Test content",
-                line_start=1,
-                line_end=more_lines_than_max,
-                lines_hash="dummy-hash",
+            remove_lines_fn = self.get_tool_fn(server, "remove_lines")
+            result = await remove_lines_fn(
+                line_start=1, line_end=server.max_edit_lines + 1, lines_hash="dummy"
             )
 
             assert "error" in result
             assert (
-                f"Cannot overwrite more than 50 lines at once (attempted {more_lines_than_max} lines)."
+                f"Cannot remove more than {server.max_edit_lines} lines at once"
                 in result["error"]
             )
 
+            # Test removing exactly server.max_edit_lines lines (should work)
+            get_text_fn = self.get_tool_fn(server, "get_text")
             result = await get_text_fn(1, server.max_edit_lines)
+            lines_hash = result["lines_hash"]
+
+            result = await remove_lines_fn(
+                line_start=1, line_end=server.max_edit_lines, lines_hash=lines_hash
+            )
+
+            assert result["status"] == "success"
+            assert f"Lines 1 to {server.max_edit_lines} removed" in result["message"]
+
+            # Verify there are only 50 lines left
+            result = await get_text_fn()
+            lines = result["text"].splitlines()
+            assert len(lines) == 50
+            assert f"Line {server.max_edit_lines+1}" in lines[0]
 
         finally:
             if os.path.exists(large_file_path):
                 os.unlink(large_file_path)
+
+    @pytest.mark.asyncio
+    async def test_replace_text_with_remove_and_insert(self, server, temp_file):
+        """Test using remove_lines and insert_lines together to replace content (replacing overwrite_text)."""
+
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+
+        # First, read the file to verify initial state
+        get_text_fn = self.get_tool_fn(server, "get_text")
+        initial_result = await get_text_fn()
+        assert (
+            "1|Line 1\n2|Line 2\n3|Line 3\n4|Line 4\n5|Line 5\n"
+            == initial_result["text"]
+        )
+
+        # Get hash for lines 2-4 that we want to replace
+        result = await get_text_fn(2, 4)
+        lines_hash = result["lines_hash"]
+
+        # Step 1: Remove lines 2-4
+        remove_lines_fn = self.get_tool_fn(server, "remove_lines")
+        result = await remove_lines_fn(line_start=2, line_end=4, lines_hash=lines_hash)
+        assert result["status"] == "success"
+
+        # Step 2: Get hash for the line before where we want to insert (now line 1)
+        result = await get_text_fn(1, 1)
+        line_1_hash = result["lines_hash"]
+
+        # Step 3: Insert new content after line 1
+        insert_lines_fn = self.get_tool_fn(server, "insert_lines")
+        new_text = "Completely new line 2.\nAnd new line 3.\nAnd new line 4."
+        result = await insert_lines_fn(text=new_text, line=1, lines_hash=line_1_hash)
+        assert result["status"] == "success"
+
+        # Verify final content
+        result = await get_text_fn()
+        lines = result["text"].splitlines()
+
+        assert len(lines) == 5
+        assert "Line 1" in lines[0]
+        assert "Completely new line 2" in lines[1]
+        assert "And new line 3" in lines[2]
+        assert "And new line 4" in lines[3]
+        assert "Line 5" in lines[4]
