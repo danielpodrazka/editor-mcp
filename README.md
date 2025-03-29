@@ -159,12 +159,19 @@ pip install pytest pytest-asyncio pytest-cov
 uv pip install pytest pytest-asyncio pytest-cov
 ```
 
-For JavaScript/JSX syntax validation, you need Node.js and Babel:
+For JavaScript/JSX syntax validation, you need Node.js and Babel. The text editor uses `npx babel` to check JS/JSX syntax when editing these file types:
 
 ```bash
-# Install babel for JavaScript validation (if needed)
+# Required for JavaScript/JSX syntax checking
 npm install --save-dev @babel/core @babel/cli @babel/preset-env @babel/preset-react
+# You can also install these globally if you prefer
+# npm install -g @babel/core @babel/cli @babel/preset-env @babel/preset-react
 ```
+
+The editor requires:
+- `@babel/core` and `@babel/cli` - Core Babel packages for syntax checking
+- `@babel/preset-env` - For standard JavaScript (.js) files
+- `@babel/preset-react` - For React JSX (.jsx) files
 
 ### Running Tests
 
