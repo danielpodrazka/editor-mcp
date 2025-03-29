@@ -13,13 +13,14 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 - **Search Operations**: Find lines containing specific text
 ## Installation
 
+Install from the lock file:
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/mcp-text-editor.git
-cd mcp-text-editor
+uv pip install -r requirements.lock
+```
 
-# Install dependencies
-pip install -e .
+### Generating a locked requirements file:
+```bash
+uv pip compile requirements.in -o requirements.lock
 ```
 
 ## Usage
@@ -142,10 +143,27 @@ Environment variables:
 
 ### Prerequisites
 
+The mcp-text-editor requires:
+- Python 3.7+
+- FastMCP package
+- black (for Python code formatting checks)
+- Babel (for JavaScript/JSX syntax checks if working with those files)
+
 Install development dependencies:
 
 ```bash
+# Using pip
 pip install pytest pytest-asyncio pytest-cov
+
+# Using uv
+uv pip install pytest pytest-asyncio pytest-cov
+```
+
+For JavaScript/JSX syntax validation, you need Node.js and Babel:
+
+```bash
+# Install babel for JavaScript validation (if needed)
+npm install --save-dev @babel/core @babel/cli @babel/preset-env @babel/preset-react
 ```
 
 ### Running Tests
@@ -191,12 +209,73 @@ The test suite covers:
    - Error handling for non-existent files
    - Handling cases with no matches
    - Handling existing files
-## How it Works
 
+## Dependency Configuration
+
+### Sample requirements.in file
+
+For uv installations, you can create a `requirements.in` file with your direct dependencies:
+
+```
+# Core dependencies
+mcp-server
+black
+
+# Development dependencies
+pytest
+pytest-asyncio
+pytest-cov
+```
+
+### Sample requirements.txt
+
+For pip installations, you can create a `requirements.txt` file:
+
+```
+mcp-server>=0.1.0
+black>=23.0.0
+pytest>=7.0.0
+pytest-asyncio>=0.18.0
+pytest-cov>=2.12.0
+```
+
+### Sample pyproject.toml
+
+For modern Python package management, you can use a `pyproject.toml` file:
+
+```toml
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-text-editor"
+version = "0.1.0"
+description = "A Python-based text editor server built with FastMCP"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+dependencies = [
+    "mcp-server>=0.1.0",
+    "black>=23.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.18.0", 
+    "pytest-cov>=2.12.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+```
 
 ## How it Works
 
 The server uses FastMCP to expose text editing capabilities through a well-defined API. The ID verification system ensures data integrity by verifying that the content hasn't changed between reading and modifying operations.
+
 The ID mechanism uses SHA-256 to generate a unique identifier of the file content or selected line ranges. For line-specific operations, the ID includes a prefix indicating the line range (e.g., "L10-15-[hash]"). This helps ensure that edits are being applied to the expected content.
 
 ## Implementation Details
