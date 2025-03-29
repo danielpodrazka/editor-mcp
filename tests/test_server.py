@@ -194,6 +194,7 @@ class TestTextEditorServer:
             if os.path.exists(large_file_path):
                 os.unlink(large_file_path)
 
+    @pytest.mark.skip("new_file is disabled")
     @pytest.mark.asyncio
     async def test_new_file(self, server, empty_temp_file):
         """Test new_file functionality."""
@@ -215,6 +216,7 @@ class TestTextEditorServer:
         result = await new_file_fn(empty_temp_file, "This should fail.")
         assert "error" in result
 
+    @pytest.mark.skip("delete_file is disabled")
     @pytest.mark.asyncio
     async def test_delete_file(self, server):
         """Test delete_file tool."""
@@ -250,6 +252,7 @@ class TestTextEditorServer:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
 
+    @pytest.mark.skip("delete_file is disabled")
     @pytest.mark.asyncio
     async def test_delete_file_permission_error(self, server, monkeypatch):
         """Test delete_file with permission error."""

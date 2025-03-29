@@ -42,7 +42,7 @@ class TextEditorServer:
     - Creating new files
     - Deleting files
 
-    The server uses iding to ensure file content integrity during editing operations.
+    The server uses IDs to ensure file content integrity during editing operations.
     It registers all tools with FastMCP for remote procedure calling.
 
     Attributes:
@@ -93,7 +93,11 @@ class TextEditorServer:
             with open(self.current_file_path, "r", encoding="utf-8") as file:
                 lines = file.readlines()
                 text = "".join(lines)
-            return {"text": text}
+            return {
+                "text": text,
+                "total_lines": len(lines),
+                "max_edit_lines": self.max_edit_lines,
+            }
 
         @self.mcp.tool()
         async def read(start: int, end: int) -> Dict[str, Any]:
@@ -237,7 +241,6 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error writing to file: {str(e)}"}
 
-        @self.mcp.tool()
         async def delete_file() -> Dict[str, Any]:
             """
             Delete the currently set file.
@@ -266,7 +269,6 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error deleting file: {str(e)}"}
 
-        @self.mcp.tool()
         async def new_file(
             planning_to_overwrite_existing_file: bool, absolute_file_path: str
         ) -> Dict[str, Any]:
