@@ -34,6 +34,57 @@ def calculate_id(text: str, start: int = None, end: int = None) -> str:
     return f"{prefix}{hashlib.sha256(text.encode()).hexdigest()[:2]}"
 
 
+def generate_diff_preview(
+    original_lines: list, modified_lines: list, start: int, end: int
+) -> str:
+    """
+    Generate a diff preview comparing original and modified content.
+
+    Args:
+        original_lines (list): List of original file lines
+        modified_lines (list): List of modified file lines
+        start (int): Start line number of the edit (1-based)
+        end (int): End line number of the edit (1-based)
+
+    Returns:
+        str: A human-readable diff preview in a format similar to git diff
+    """
+    diff_lines = []
+
+    # Header
+    diff_lines.append(f"@@ Diff preview for lines {start}-{end} @@")
+
+    # Add some context lines before the change
+    context_start = max(0, start - 1 - 3)  # 3 lines of context before
+    for i in range(context_start, start - 1):
+        diff_lines.append(f" {i+1:4d}| {original_lines[i].rstrip()}")
+
+    # Show removed lines
+    for i in range(start - 1, end):
+        diff_lines.append(f"-{i+1:4d}| {original_lines[i].rstrip()}")
+
+    # Show added lines
+    new_content = "".join(
+        modified_lines[
+            start - 1 : start
+            - 1
+            + len(modified_lines)
+            - len(original_lines)
+            + (end - (start - 1))
+        ]
+    )
+    new_lines = new_content.splitlines()
+    for i, line in enumerate(new_lines):
+        diff_lines.append(f"+{start+i:4d}| {line}")
+
+    # Add some context lines after the change
+    context_end = min(len(original_lines), end + 3)  # 3 lines of context after
+    for i in range(end, context_end):
+        diff_lines.append(f" {i+1:4d}| {original_lines[i].rstrip()}")
+
+    return "\n".join(diff_lines)
+
+
 class TextEditorServer:
     """
     A server implementation for a text editor application using FastMCP.
@@ -48,12 +99,19 @@ class TextEditorServer:
     The server uses IDs to ensure file content integrity during editing operations.
     It registers all tools with FastMCP for remote procedure calling.
 
+    The editor implements a two-step edit process:
+    1. First, the overwrite tool creates a diff preview of the changes
+    2. Then, the decide tool allows accepting or canceling the pending changes
+
     Attributes:
         mcp (FastMCP): The MCP server instance for handling tool registrations
         max_edit_lines (int): Maximum number of lines that can be edited with id verification
         current_file_path (str, optional): Path to the currently active file
         selected_start (int, optional): Start line of the current selection
         selected_end (int, optional): End line of the current selection
+        selected_id (str, optional): ID of the current selection for verification
+        pending_modified_lines (list, optional): Pending modified lines for preview before committing
+        pending_diff (str, optional): Diff preview of pending changes
         selected_id (str, optional): ID of the current selection for verification
     """
 
@@ -64,6 +122,9 @@ class TextEditorServer:
         self.selected_start = None
         self.selected_end = None
         self.selected_id = None
+        # Attributes for pending changes
+        self.pending_modified_lines = None
+        self.pending_diff = None
 
         self.register_tools()
 
@@ -214,22 +275,21 @@ class TextEditorServer:
             text: str,
         ) -> Dict[str, Any]:
             """
-            Overwrite a range of lines in the current file with new text.
+            Prepare to overwrite a range of lines in the current file with new text.
 
-
-            Overwrite previously selected lines.
+            This is the first step in a two-step process:
+            1. First call overwrite() to generate a diff preview
+            2. Then call decide() to accept or cancel the pending changes
 
             Args:
                 text (str): New text to overwrite the selected range
 
             Returns:
-                dict: Operation result with status and message
+                dict: Diff preview showing the proposed changes
 
             Notes:
                 - This tool allows replacing the previously selected lines with new content
                 - The number of new lines can differ from the original selection
-                - The selection is removed upon successful overwrite
-                - To remove lines, provide an empty string as the text parameter
                 - For Python files (.py extension), syntax checking is performed before writing
                 - For JavaScript/React files (.js, .jsx extensions), syntax checking is also performed
             """
@@ -337,17 +397,70 @@ class TextEditorServer:
                     if os.path.exists(temp_path):
                         os.unlink(temp_path)
 
+            # Generate diff preview
+            diff_preview = generate_diff_preview(lines, modified_lines, start, end)
+
+            # Store pending changes for later application
+            self.pending_modified_lines = modified_lines
+            self.pending_diff = diff_preview
+
+            result = {
+                "status": "preview",
+                "message": "Changes ready to apply. Use decide('accept') to apply or decide('cancel') to discard.",
+                "diff_preview": diff_preview,
+                "start": start,
+                "end": end,
+            }
+
+            return result
+
+        @self.mcp.tool()
+        async def decide(
+            decision: str,
+        ) -> Dict[str, Any]:
+            """
+            Apply or cancel pending changes from the overwrite operation.
+
+            This is the second step in the two-step process:
+            1. First call overwrite() to generate a diff preview
+            2. Then call decide() to accept or cancel the pending changes
+
+            Args:
+                decision (str): Either 'accept' to apply changes or 'cancel' to discard them
+
+            Returns:
+                dict: Operation result with status and message
+            """
+            if self.pending_modified_lines is None or self.pending_diff is None:
+                return {"error": "No pending changes to apply. Use overwrite first."}
+
+            if decision.lower() not in ["accept", "cancel"]:
+                return {"error": "Decision must be either 'accept' or 'cancel'."}
+
+            if decision.lower() == "cancel":
+                self.pending_modified_lines = None
+                self.pending_diff = None
+
+                return {
+                    "status": "success",
+                    "message": "Changes cancelled.",
+                }
+
             try:
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
-                    file.writelines(modified_lines)
+                    file.writelines(self.pending_modified_lines)
 
                 result = {
                     "status": "success",
-                    "message": f"Text overwritten from line {start} to {end}",
+                    "message": f"Changes applied successfully.",
                 }
+
                 self.selected_start = None
                 self.selected_end = None
                 self.selected_id = None
+                self.pending_modified_lines = None
+                self.pending_diff = None
+
                 return result
             except Exception as e:
                 return {"error": f"Error writing to file: {str(e)}"}

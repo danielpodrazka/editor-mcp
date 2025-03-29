@@ -7,7 +7,8 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 - **File Selection**: Set a file to work with using absolute paths
 - **Read Operations**: Read entire files or specific line ranges
 - **Edit Operations**: 
-  - Overwrite text in a specified line range
+  - Two-step editing process with diff preview
+  - Select and overwrite text in a specified line range
   - Create new files with content
 - **File Deletion**: Remove files from the filesystem
 - **Search Operations**: Find lines containing specific text
@@ -84,29 +85,43 @@ Select a range of lines from the current file for subsequent overwrite operation
 - This must be used before calling the overwrite tool
 
 #### 5. `overwrite`
-Overwrite a range of lines in the current file with new text.
+Prepare to overwrite a range of lines in the current file with new text.
 
 **Parameters**:
 - `text` (str): New text to overwrite the selected range
 
 **Returns**:
-- Operation result with status and message
+- Diff preview showing the proposed changes
 
 **Note**:
+- This is the first step in a two-step process:
+  1. First call overwrite() to generate a diff preview
+  2. Then call decide() to accept or cancel the pending changes
 - This tool allows replacing the previously selected lines with new content
 - The number of new lines can differ from the original selection
-- The selection is removed upon successful overwrite
-- To remove lines, provide an empty string as the text parameter
 - For Python files (.py extension), syntax checking is performed before writing
 - For JavaScript/React files (.js, .jsx extensions), syntax checking is also performed
 
-#### 6. `delete_file`
+#### 6. `decide`
+Apply or cancel pending changes from the overwrite operation.
+
+**Parameters**:
+- `decision` (str): Either 'accept' to apply changes or 'cancel' to discard them
+
+**Returns**:
+- Operation result with status and message
+
+**Note**:
+- This is the second step in the two-step process after using overwrite
+- The selection is removed upon successful application of changes
+
+#### 7. `delete_file`
 Delete the currently set file.
 
 **Returns**:
 - Operation result with status and message
 
-#### 7. `new_file`
+#### 8. `new_file`
 Creates a new file.
 
 **Parameters**:
@@ -118,7 +133,7 @@ Creates a new file.
 **Note**:
 - This tool will fail if the current file exists and is not empty
 
-#### 8. `find_line`
+#### 9. `find_line`
 Find lines that match provided text in the current file.
 
 **Parameters**:
@@ -219,15 +234,20 @@ The test suite covers:
    - Verification of selected content using ID
    - Content replacement validation
    - Syntax checking for Python and JavaScript/React files
+   - Generation of diff preview for changes
+
+5. **decide tool**
+   - Applying or canceling pending changes
+   - Two-step verification process
    
-5. **delete_file tool**
+6. **delete_file tool**
    - File deletion validation
 
-6. **new_file tool**
+7. **new_file tool**
    - File creation validation
    - Handling existing files
 
-7. **find_line tool**
+8. **find_line tool**
    - Finding text matches in files
    - Handling specific search terms
    - Error handling for non-existent files
@@ -247,12 +267,13 @@ The main `TextEditorServer` class:
 1. Initializes with a FastMCP instance named "text-editor"
 2. Sets a configurable `max_edit_lines` limit (default: 50) from environment variables
 3. Maintains the current file path as state
-4. Registers eight primary tools through FastMCP:
+4. Registers nine primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
    - `skim`: Reads the entire content of a file
    - `read`: Reads text from specified line range
    - `select`: Selects lines for subsequent overwrite operation
-   - `overwrite`: Replaces previously selected text with new content
+   - `overwrite`: Prepares diff preview for changing content
+   - `decide`: Applies or cancels pending changes
    - `delete_file`: Deletes the current file
    - `new_file`: Creates a new file
    - `find_line`: Finds lines containing specific text

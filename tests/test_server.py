@@ -2,7 +2,6 @@ import os
 import pytest
 import tempfile
 import hashlib
-
 from src.text_editor.server import TextEditorServer, calculate_id
 
 
@@ -21,9 +20,7 @@ class TestTextEditorServer:
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             f.write(content)
             temp_path = f.name
-
         yield temp_path
-
         if os.path.exists(temp_path):
             os.unlink(temp_path)
 
@@ -32,15 +29,12 @@ class TestTextEditorServer:
         """Create an empty temporary file for testing."""
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             temp_path = f.name
-
         yield temp_path
-
         if os.path.exists(temp_path):
             os.unlink(temp_path)
 
     def get_tool_fn(self, server, tool_name):
         """Helper to get the tool function from the server."""
-
         tools_dict = server.mcp._tool_manager._tools
         return tools_dict[tool_name].fn
 
@@ -48,9 +42,7 @@ class TestTextEditorServer:
     async def test_set_file_valid(self, server, temp_file):
         """Test setting a valid file path."""
         set_file_fn = self.get_tool_fn(server, "set_file")
-
         result = await set_file_fn(temp_file)
-
         assert "File set to:" in result
         assert temp_file in result
         assert server.current_file_path == temp_file
@@ -59,10 +51,8 @@ class TestTextEditorServer:
     async def test_set_file_invalid(self, server):
         """Test setting a non-existent file path."""
         set_file_fn = self.get_tool_fn(server, "set_file")
-
         non_existent_path = "/path/to/nonexistent/file.txt"
         result = await set_file_fn(non_existent_path)
-
         assert "Error: File not found" in result
         assert server.current_file_path is None
 
@@ -70,9 +60,7 @@ class TestTextEditorServer:
     async def test_read_no_file_set(self, server):
         """Test getting text when no file is set."""
         read_fn = self.get_tool_fn(server, "read")
-
         result = await read_fn(1, 10)
-
         assert "error" in result
         assert "No file path is set" in result["error"]
 
@@ -81,33 +69,23 @@ class TestTextEditorServer:
         """Test getting the entire content of a file."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(1, 5)
-
         assert "text" in result
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == result["text"]
-        # No id in read anymore, only in select
 
     async def test_read_line_range(self, server, temp_file):
         """Test getting a specific range of lines from a file."""
-
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(2, 4)
-
         assert "text" in result
         assert "Line 2\nLine 3\nLine 4\n" == result["text"]
-
-        # Let's test select functionality here too
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(2, 4)
-
         assert select_result["text"] == "Line 2\nLine 3\nLine 4\n"
         assert "id" in select_result
-
         expected_id = calculate_id("Line 2\nLine 3\nLine 4\n", 2, 4)
         assert expected_id == select_result["id"]
         assert expected_id == result["id"]
@@ -117,13 +95,10 @@ class TestTextEditorServer:
         """Test getting text with only end line specified."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(1, 2)
         assert "text" in result
         assert result["text"] == "Line 1\nLine 2\n"
-
-        # Test select for ID
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(1, 2)
         expected_id = calculate_id("Line 1\nLine 2\n", 1, 2)
@@ -134,13 +109,10 @@ class TestTextEditorServer:
         """Test getting text with an invalid line range."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         read_fn = self.get_tool_fn(server, "read")
-
         result = await read_fn(4, 2)
         assert "error" in result
         assert "start cannot be greater than end" in result["error"]
-
         result = await read_fn(0, 3)
         assert "error" in result
         assert "start must be at least 1" in result["error"]
@@ -150,20 +122,16 @@ class TestTextEditorServer:
         """Test getting a line range that exceeds the file's line count."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(3, 10)
-
         assert "Line 3\nLine 4\nLine 5\n" == result["text"]
 
     def test_calculate_id_function(self):
         """Test the calculate_id function directly."""
-
         text = "Some test content"
         id_no_range = calculate_id(text)
         expected = hashlib.sha256(text.encode()).hexdigest()[:2]
         assert id_no_range == expected
-
         id_with_range = calculate_id(text, 1, 3)
         assert id_with_range.startswith("L1-3-")
         assert id_with_range.endswith(expected)
@@ -176,18 +144,13 @@ class TestTextEditorServer:
             for i in range(more_than_max_lines):
                 f.write(f"Line {i + 1}\n")
             large_file_path = f.name
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(large_file_path)
-
             read_fn = self.get_tool_fn(server, "read")
             result = await read_fn(1, more_than_max_lines)
-
             assert "text" in result
             assert len(result["text"].splitlines()) == more_than_max_lines
-
-            # Test select with max lines
             select_fn = self.get_tool_fn(server, "select")
             result = await select_fn(1, more_than_max_lines)
             assert "error" in result
@@ -195,16 +158,12 @@ class TestTextEditorServer:
                 f"Cannot select more than {server.max_edit_lines} lines at once"
                 in result["error"]
             )
-
-            # Test valid select with fewer lines
             result = await select_fn(5, 15)
             assert "text" in result
             assert "id" in result
-            # Read with range exceeding max_edit_lines
             result = await read_fn(5, server.max_edit_lines + 10)
             assert "text" in result
             assert len(result["text"].splitlines()) == server.max_edit_lines + 6
-
         finally:
             if os.path.exists(large_file_path):
                 os.unlink(large_file_path)
@@ -212,50 +171,37 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_new_file(self, server, empty_temp_file):
         """Test new_file functionality."""
-
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(empty_temp_file)
-
         new_file_fn = self.get_tool_fn(server, "new_file")
         result = await new_file_fn(empty_temp_file)
-
         assert result["status"] == "success"
         assert "id" in result
-
         result = await new_file_fn(empty_temp_file)
         assert "error" in result
 
     @pytest.mark.asyncio
     async def test_delete_file(self, server):
         """Test delete_file tool."""
-
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             f.write("Test content to delete")
             temp_path = f.name
-
         try:
             delete_file_fn = self.get_tool_fn(server, "delete_file")
             result = await delete_file_fn()
             assert "error" in result
             assert "No file path is set" in result["error"]
-
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(temp_path)
-
             result = await delete_file_fn()
             assert result["status"] == "success"
             assert "successfully deleted" in result["message"]
             assert temp_path in result["message"]
-
             assert not os.path.exists(temp_path)
-
             assert server.current_file_path is None
-
             result = await set_file_fn(temp_path)
             assert "Error: File not found" in result
-
             assert server.current_file_path is None
-
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -263,11 +209,9 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_delete_file_permission_error(self, server, monkeypatch):
         """Test delete_file with permission error."""
-
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             f.write("Test content")
             temp_path = f.name
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(temp_path)
@@ -276,15 +220,11 @@ class TestTextEditorServer:
                 raise PermissionError("Permission denied")
 
             monkeypatch.setattr(os, "remove", mock_remove)
-
             delete_file_fn = self.get_tool_fn(server, "delete_file")
             result = await delete_file_fn()
-
             assert "error" in result
             assert "Permission denied" in result["error"]
-
             assert server.current_file_path == temp_path
-
         finally:
             monkeypatch.undo()
             if os.path.exists(temp_path):
@@ -294,9 +234,7 @@ class TestTextEditorServer:
     async def test_find_line_no_file_set(self, server):
         """Test find_line with no file set."""
         find_line_fn = self.get_tool_fn(server, "find_line")
-
         result = await find_line_fn(search_text="Line")
-
         assert "error" in result
         assert "No file path is set" in result["error"]
 
@@ -305,26 +243,18 @@ class TestTextEditorServer:
         """Test basic find_line functionality."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         find_line_fn = self.get_tool_fn(server, "find_line")
-
-        # Search for a common term that should be in all lines
         result = await find_line_fn(search_text="Line")
-
         assert "status" in result
         assert result["status"] == "success"
         assert "matches" in result
         assert "total_matches" in result
         assert result["total_matches"] == 5
-
-        # Verify structure of the matches
         for match in result["matches"]:
             assert "line_number" in match
             assert "id" in match
             assert "text" in match
             assert f"Line {match['line_number']}" in match["text"]
-
-        # Verify the line numbers are sequential
         line_numbers = [match["line_number"] for match in result["matches"]]
         assert line_numbers == [1, 2, 3, 4, 5]
 
@@ -333,12 +263,8 @@ class TestTextEditorServer:
         """Test find_line with a specific search term."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         find_line_fn = self.get_tool_fn(server, "find_line")
-
-        # Search for a term that should only be in one line
         result = await find_line_fn(search_text="Line 3")
-
         assert result["status"] == "success"
         assert result["total_matches"] == 1
         assert len(result["matches"]) == 1
@@ -350,12 +276,8 @@ class TestTextEditorServer:
         """Test find_line with a search term that doesn't exist."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         find_line_fn = self.get_tool_fn(server, "find_line")
-
-        # Search for a non-existent term
         result = await find_line_fn(search_text="NonExistentTerm")
-
         assert result["status"] == "success"
         assert result["total_matches"] == 0
         assert len(result["matches"]) == 0
@@ -366,15 +288,12 @@ class TestTextEditorServer:
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        # Mock open to raise an exception
         def mock_open(*args, **kwargs):
             raise IOError("Mock file read error")
 
         monkeypatch.setattr("builtins.open", mock_open)
-
         find_line_fn = self.get_tool_fn(server, "find_line")
         result = await find_line_fn(search_text="Line")
-
         assert "error" in result
         assert "Error searching file" in result["error"]
         assert "Mock file read error" in result["error"]
@@ -383,9 +302,7 @@ class TestTextEditorServer:
     async def test_overwrite_no_file_set(self, server):
         """Test overwrite when no file is set."""
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-
         result = await overwrite_fn(text="New content")
-
         assert "error" in result
         assert "No file path is set" in result["error"]
 
@@ -394,27 +311,22 @@ class TestTextEditorServer:
         """Test basic overwrite functionality."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
-        # First select the content
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(2, 4)
-
         assert select_result["status"] == "success"
         assert "id" in select_result
-
-        # Now overwrite lines 2-4
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         new_content = "New Line 2\nNew Line 3\nNew Line 4\n"
         result = await overwrite_fn(text=new_content)
-
         assert "status" in result
-        assert result["status"] == "success"
-        assert "Text overwritten from line 2 to 4" in result["message"]
-
-        # Verify the file was actually modified
+        assert result["status"] == "preview"
+        assert "Changes ready to apply" in result["message"]
+        decide_fn = self.get_tool_fn(server, "decide")
+        decide_result = await decide_fn(decision="accept")
+        assert decide_result["status"] == "success"
+        assert "Changes applied successfully" in decide_result["message"]
         with open(temp_file, "r") as f:
             file_content = f.read()
-
         expected_content = "Line 1\nNew Line 2\nNew Line 3\nNew Line 4\nLine 5\n"
         assert file_content == expected_content
 
@@ -423,21 +335,13 @@ class TestTextEditorServer:
         """Test select with invalid line ranges."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
         select_fn = self.get_tool_fn(server, "select")
-
-        # Test with start < 1
         result = await select_fn(start=0, end=2)
         assert "error" in result
         assert "start must be at least 1" in result["error"]
-
-        # Test with end > file length
         result = await select_fn(start=1, end=10)
-        # This should now adjust the end line to match file length
         assert "end" in result
-        assert result["end"] == 5  # Our test file has 5 lines
-
-        # Test with start > end
+        assert result["end"] == 5
         result = await select_fn(start=4, end=2)
         assert "error" in result
         assert "start cannot be greater than end" in result["error"]
@@ -447,21 +351,14 @@ class TestTextEditorServer:
         """Test overwrite with incorrect ID (content verification failure)."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
-        # First select lines 2-3
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(2, 3)
-
-        # Modify the file to cause verification failure
         with open(temp_file, "w") as f:
             f.write(
                 "Modified Line 1\nModified Line 2\nModified Line 3\nModified Line 4\nModified Line 5\n"
             )
-
-        # Try to overwrite with the old selection
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         result = await overwrite_fn(text="New content")
-
         assert "error" in result
         assert "id verification failed" in result["error"]
 
@@ -470,45 +367,31 @@ class TestTextEditorServer:
         """Test overwrite with different line count (more or fewer lines)."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
-        # First select the content
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(2, 3)
-
         assert select_result["status"] == "success"
-
-        # Replace 2 lines with 3 lines
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         new_content = "New Line 2\nExtra Line\nNew Line 3\n"
-
-        # Replace 2 lines with 3 lines
         result = await overwrite_fn(text=new_content)
-
-        assert result["status"] == "success"
-
-        # Verify the file content
+        assert result["status"] == "preview"
+        decide_fn = self.get_tool_fn(server, "decide")
+        decide_result = await decide_fn(decision="accept")
+        assert decide_result["status"] == "success"
         with open(temp_file, "r") as f:
             file_content = f.read()
-
         expected_content = (
             "Line 1\nNew Line 2\nExtra Line\nNew Line 3\nLine 4\nLine 5\n"
         )
         assert file_content == expected_content
-
-        # Now select the entire file for the next test
         select_result = await select_fn(1, 6)
         assert select_result["status"] == "success"
-
-        # Replace 6 lines with 1 line
         new_content = "Single Line\n"
         result = await overwrite_fn(text=new_content)
-
-        assert result["status"] == "success"
-
-        # Verify the file content
+        assert result["status"] == "preview"
+        decide_result = await decide_fn(decision="accept")
+        assert decide_result["status"] == "success"
         with open(temp_file, "r") as f:
             file_content = f.read()
-
         assert file_content == "Single Line\n"
 
     @pytest.mark.asyncio
@@ -516,23 +399,17 @@ class TestTextEditorServer:
         """Test overwrite with empty text (effectively removing lines)."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
-        # First select the content
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(2, 3)
-
         assert select_result["status"] == "success"
-
-        # Replace with empty string (remove lines 2-3)
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         result = await overwrite_fn(text="")
-
-        assert result["status"] == "success"
-
-        # Verify the file content
+        assert result["status"] == "preview"
+        decide_fn = self.get_tool_fn(server, "decide")
+        decide_result = await decide_fn(decision="accept")
+        assert decide_result["status"] == "success"
         with open(temp_file, "r") as f:
             file_content = f.read()
-
         expected_content = "Line 1\nLine 4\nLine 5\n"
         assert file_content == expected_content
 
@@ -541,26 +418,20 @@ class TestTextEditorServer:
         """Test select with a range exceeding max_edit_lines."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
-        # Create a temporary file with more than max_edit_lines
         more_than_max_lines = server.max_edit_lines + 10
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             for i in range(more_than_max_lines):
                 f.write(f"Line {i + 1}\n")
             large_file_path = f.name
-
         try:
             await set_file_fn(large_file_path)
-
             select_fn = self.get_tool_fn(server, "select")
             result = await select_fn(start=1, end=server.max_edit_lines + 1)
-
             assert "error" in result
             assert (
                 f"Cannot select more than {server.max_edit_lines} lines at once"
                 in result["error"]
             )
-
         finally:
             if os.path.exists(large_file_path):
                 os.unlink(large_file_path)
@@ -570,14 +441,9 @@ class TestTextEditorServer:
         """Test overwrite with file read error."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
-        # First select the content
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(2, 3)
-
         assert select_result["status"] == "success"
-
-        # Mock open to raise an exception during read
         original_open = open
 
         def mock_open_read(*args, **kwargs):
@@ -586,10 +452,8 @@ class TestTextEditorServer:
             return original_open(*args, **kwargs)
 
         monkeypatch.setattr("builtins.open", mock_open_read)
-
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         result = await overwrite_fn(text="New content")
-
         assert "error" in result
         assert "Error reading file" in result["error"]
         assert "Mock file read error" in result["error"]
@@ -599,14 +463,9 @@ class TestTextEditorServer:
         """Test overwrite with file write error."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-
-        # First select the content
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(2, 3)
-
         assert select_result["status"] == "success"
-
-        # Mock open for writing to raise an exception
         original_open = open
         open_calls = [0]
 
@@ -616,47 +475,38 @@ class TestTextEditorServer:
             return original_open(*args, **kwargs)
 
         monkeypatch.setattr("builtins.open", mock_open_write)
-
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         result = await overwrite_fn(text="New content")
-
-        assert "error" in result
-        assert "Error writing to file" in result["error"]
-        assert "Mock file write error" in result["error"]
+        assert "status" in result
+        assert result["status"] == "preview"
+        decide_fn = self.get_tool_fn(server, "decide")
+        decide_result = await decide_fn(decision="accept")
+        assert "error" in decide_result
+        assert "Error writing to file" in decide_result["error"]
+        assert "Mock file write error" in decide_result["error"]
 
     @pytest.mark.asyncio
     async def test_overwrite_newline_handling(self, server):
         """Test newline handling in overwrite (appends newline when needed)."""
-        # Create a file with text that doesn't end with a newline
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
-            f.write("Line 1\nLine 2\nLine 3")  # No trailing newline
+            f.write("Line 1\nLine 2\nLine 3")
             temp_path = f.name
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(temp_path)
-
-            # First select the content
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(2, 2)
-
             assert select_result["status"] == "success"
-
-            # Replace line 2
             overwrite_fn = self.get_tool_fn(server, "overwrite")
-            result = await overwrite_fn(
-                text="New Line 2"  # No trailing newline
-            )
-
-            assert result["status"] == "success"
-
-            # Verify the file content, should add newline
+            result = await overwrite_fn(text="New Line 2")
+            assert result["status"] == "preview"
+            decide_fn = self.get_tool_fn(server, "decide")
+            decide_result = await decide_fn(decision="accept")
+            assert decide_result["status"] == "success"
             with open(temp_path, "r") as f:
                 file_content = f.read()
-
             expected_content = "Line 1\nNew Line 2\nLine 3"
             assert file_content == expected_content
-
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -664,38 +514,29 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_overwrite_python_syntax_check_success(self, server):
         """Test Python syntax checking in overwrite succeeds with valid Python code."""
-        # Create a temporary Python file with valid code
         valid_python_content = (
             "def hello():\n    print('Hello, world!')\n\nresult = hello()\n"
         )
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
             f.write(valid_python_content)
             py_file_path = f.name
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(py_file_path)
-
-            # First select the content
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(1, 4)
-
             assert select_result["status"] == "success"
-
-            # Modify with valid Python code
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             new_content = "def greeting(name):\n    return f'Hello, {name}!'\n\nresult = greeting('World')\n"
             result = await overwrite_fn(text=new_content)
-
-            assert result["status"] == "success"
-            assert "Text overwritten" in result["message"]
-
-            # Verify the file was updated
+            assert result["status"] == "preview"
+            decide_fn = self.get_tool_fn(server, "decide")
+            decide_result = await decide_fn(decision="accept")
+            assert decide_result["status"] == "success"
+            assert "Changes applied successfully" in decide_result["message"]
             with open(py_file_path, "r") as f:
                 file_content = f.read()
-
             assert file_content == new_content
-
         finally:
             if os.path.exists(py_file_path):
                 os.unlink(py_file_path)
@@ -703,38 +544,26 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_overwrite_python_syntax_check_failure(self, server):
         """Test Python syntax checking in overwrite fails with invalid Python code."""
-        # Create a temporary Python file with valid code
         valid_python_content = (
             "def hello():\n    print('Hello, world!')\n\nresult = hello()\n"
         )
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
             f.write(valid_python_content)
             py_file_path = f.name
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(py_file_path)
-
-            # First select the content
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(1, 4)
-
             assert select_result["status"] == "success"
-
-            # Try to replace with invalid Python code (syntax error)
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             invalid_python = "def broken_function(:\n    print('Missing parenthesis'\n\nresult = broken_function()\n"
             result = await overwrite_fn(text=invalid_python)
-
             assert "error" in result
             assert "Python syntax error:" in result["error"]
-
-            # Verify the file was not modified
             with open(py_file_path, "r") as f:
                 file_content = f.read()
-
-            assert file_content == valid_python_content  # File should remain unchanged
-
+            assert file_content == valid_python_content
         finally:
             if os.path.exists(py_file_path):
                 os.unlink(py_file_path)
@@ -742,13 +571,11 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_overwrite_javascript_syntax_check_success(self, server, monkeypatch):
         """Test JavaScript syntax checking in overwrite succeeds with valid JS code."""
-        # Create a temporary JS file with valid code
         valid_js_content = "function hello() {\n  return 'Hello, world!';\n}\n\nconst result = hello();\n"
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".js", delete=False) as f:
             f.write(valid_js_content)
             js_file_path = f.name
 
-        # Mock the subprocess.run to simulate successful Babel execution
         def mock_subprocess_run(*args, **kwargs):
             class MockCompletedProcess:
                 def __init__(self):
@@ -759,29 +586,23 @@ class TestTextEditorServer:
             return MockCompletedProcess()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(js_file_path)
-
-            # First select the content
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(1, 5)
-
             assert select_result["status"] == "success"
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             new_js_content = "function greeting(name) {\n  return `Hello, ${name}!`;\n}\n\nconst result = greeting('World');\n"
             result = await overwrite_fn(text=new_js_content)
-
-            assert result["status"] == "success"
-            assert "Text overwritten" in result["message"]
-
-            # Verify the file was updated
+            assert result["status"] == "preview"
+            decide_fn = self.get_tool_fn(server, "decide")
+            decide_result = await decide_fn(decision="accept")
+            assert decide_result["status"] == "success"
+            assert "Changes applied successfully" in decide_result["message"]
             with open(js_file_path, "r") as f:
                 file_content = f.read()
-
             assert file_content == new_js_content
-
         finally:
             if os.path.exists(js_file_path):
                 os.unlink(js_file_path)
@@ -789,13 +610,11 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_overwrite_javascript_syntax_check_failure(self, server, monkeypatch):
         """Test JavaScript syntax checking in overwrite fails with invalid JS code."""
-        # Create a temporary JS file with valid code
         valid_js_content = "function hello() {\n  return 'Hello, world!';\n}\n\nconst result = hello();\n"
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".js", delete=False) as f:
             f.write(valid_js_content)
             js_file_path = f.name
 
-        # Mock the subprocess.run to simulate Babel execution failure
         def mock_subprocess_run(*args, **kwargs):
             class MockCompletedProcess:
                 def __init__(self):
@@ -806,27 +625,19 @@ class TestTextEditorServer:
             return MockCompletedProcess()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(js_file_path)
-
-            # First select the content
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(1, 5)
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             invalid_js = "function broken() {\n  return 'Missing closing bracket;\n}\n\nconst result = broken();\n"
             result = await overwrite_fn(text=invalid_js)
-
             assert "error" in result
             assert "JavaScript syntax error:" in result["error"]
-
-            # Verify the file was not modified
             with open(js_file_path, "r") as f:
                 file_content = f.read()
-
-            assert file_content == valid_js_content  # File should remain unchanged
-
+            assert file_content == valid_js_content
         finally:
             if os.path.exists(js_file_path):
                 os.unlink(js_file_path)
@@ -834,13 +645,11 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_overwrite_jsx_syntax_check_success(self, server, monkeypatch):
         """Test JSX syntax checking in overwrite succeeds with valid React/JSX code."""
-        # Create a temporary JSX file with valid code
         valid_jsx_content = "import React from 'react';\n\nfunction HelloWorld() {\n  return <div>Hello, world!</div>;\n}\n\nexport default HelloWorld;\n"
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".jsx", delete=False) as f:
             f.write(valid_jsx_content)
             jsx_file_path = f.name
 
-        # Mock the subprocess.run to simulate successful Babel execution
         def mock_subprocess_run(*args, **kwargs):
             class MockCompletedProcess:
                 def __init__(self):
@@ -851,31 +660,23 @@ class TestTextEditorServer:
             return MockCompletedProcess()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(jsx_file_path)
-
-            # First select the content
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(1, 7)
-
             assert select_result["status"] == "success"
-
-            # Modify with valid JSX code
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             new_jsx_content = "import React from 'react';\n\nfunction Greeting({ name }) {\n  return <div>Hello, {name}!</div>;\n}\n\nexport default Greeting;\n"
             result = await overwrite_fn(text=new_jsx_content)
-
-            assert result["status"] == "success"
-            assert "Text overwritten" in result["message"]
-
-            # Verify the file was updated
+            assert result["status"] == "preview"
+            decide_fn = self.get_tool_fn(server, "decide")
+            decide_result = await decide_fn(decision="accept")
+            assert decide_result["status"] == "success"
+            assert "Changes applied successfully" in decide_result["message"]
             with open(jsx_file_path, "r") as f:
                 file_content = f.read()
-
             assert file_content == new_jsx_content
-
         finally:
             if os.path.exists(jsx_file_path):
                 os.unlink(jsx_file_path)
@@ -883,13 +684,11 @@ class TestTextEditorServer:
     @pytest.mark.asyncio
     async def test_overwrite_jsx_syntax_check_failure(self, server, monkeypatch):
         """Test JSX syntax checking in overwrite fails with invalid React/JSX code."""
-        # Create a temporary JSX file with valid code
         valid_jsx_content = "import React from 'react';\n\nfunction HelloWorld() {\n  return <div>Hello, world!</div>;\n}\n\nexport default HelloWorld;\n"
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".jsx", delete=False) as f:
             f.write(valid_jsx_content)
             jsx_file_path = f.name
 
-        # Mock the subprocess.run to simulate Babel execution failure
         def mock_subprocess_run(*args, **kwargs):
             class MockCompletedProcess:
                 def __init__(self):
@@ -900,28 +699,19 @@ class TestTextEditorServer:
             return MockCompletedProcess()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
-
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(jsx_file_path)
-
-            # First select the content
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(1, 7)
-            # Try to replace with invalid JSX code
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             invalid_jsx = "import React from 'react';\n\nfunction BrokenComponent() {\n  return <div>Missing closing tag<div>;\n}\n\nexport default BrokenComponent;\n"
             result = await overwrite_fn(text=invalid_jsx)
-
             assert "error" in result
             assert "JavaScript syntax error:" in result["error"]
-
-            # Verify the file was not modified
             with open(jsx_file_path, "r") as f:
                 file_content = f.read()
-
-            assert file_content == valid_jsx_content  # File should remain unchanged
-
+            assert file_content == valid_jsx_content
         finally:
             if os.path.exists(jsx_file_path):
                 os.unlink(jsx_file_path)
