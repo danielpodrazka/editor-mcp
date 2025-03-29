@@ -161,11 +161,6 @@ class TextEditorServer:
             """
             Overwrite a range of lines in the current file with new text.
 
-            Take a modular approach:
-            * Overwrite individual lines for smallest changes
-            * Overwrite section of a function for bigger changes
-            * Overwrite a function for biggest changes
-            Never overwrite the whole files. Aim to keep the code working between the changes
 
             Args:
                 text (str): New text to overwrite the specified range
