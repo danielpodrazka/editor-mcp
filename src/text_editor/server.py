@@ -101,12 +101,12 @@ class TextEditorServer:
             Read text from the current file and get its ID for editing operations.
 
             This is a key step before any editing operation. The returned ID is
-            required for insert and remove operations to ensure content integrity.
+            required for overwrite operations to ensure content integrity.
 
             Workflow:
             1. Call skim() to get the context of the whole file
             1. Call read(20,30) to get content of the range you want to edit (here lines 20 to 30) and its ID
-            2. Use the ID in subsequent remove operations
+            2. Use the ID in subsequent overwrite operations
 
             Args:
                 start (int, optional): Start line number (1-based indexing).
@@ -164,7 +164,7 @@ class TextEditorServer:
             Never overwrite the whole files. Aim to keep the code working between the changes
 
             Args:
-                text (str): New text to replace the specified range
+                text (str): New text to overwrite the specified range
                 start (int): Start line number (1-based)
                 end (int): End line number (1-based)
                 id (str): id of the lines in the specified range
