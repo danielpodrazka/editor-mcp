@@ -68,37 +68,49 @@ Reads text from the current file and gets its ID for editing operations.
 {"text": "def hello():\n    print(\"Hello, world!\")\n\nhello()", "id": "L1-4-a1b2c3"}
 ```
 
-#### 4. `overwrite`
+#### 4. `select`
+Select a range of lines from the current file for subsequent overwrite operation.
+
+**Parameters**:
+- `start` (int): Start line number (1-based)
+- `end` (int): End line number (1-based)
+
+**Returns**:
+- Dictionary containing the selected text, line range, and ID for verification
+
+**Note**:
+- This tool validates the selection against max_edit_lines
+- The selection details are stored for use in the overwrite tool
+- This must be used before calling the overwrite tool
+
+#### 5. `overwrite`
 Overwrite a range of lines in the current file with new text.
 
 **Parameters**:
-- `text` (str): New text to replace the specified range
-- `start` (int): Start line number (1-based)
-- `end` (int): End line number (1-based)
-- `id` (str): ID of the lines in the specified range
+- `text` (str): New text to overwrite the selected range
 
 **Returns**:
 - Operation result with status and message
 
 **Note**:
-- This tool allows replacing a range of lines with new content
-- The number of new lines can differ from the original range
+- This tool allows replacing the previously selected lines with new content
+- The number of new lines can differ from the original selection
+- The selection is removed upon successful overwrite
 - To remove lines, provide an empty string as the text parameter
-- The behavior mimics copy-paste: original lines are removed, new lines are inserted at that position
-- Small ranges like 10-20 lines are better to prevent hitting limits
+- For Python files (.py extension), syntax checking is performed before writing
+- For JavaScript/React files (.js, .jsx extensions), syntax checking is also performed
 
-#### 5. `delete_file`
+#### 6. `delete_file`
 Delete the currently set file.
 
 **Returns**:
 - Operation result with status and message
 
-#### 6. `new_file`
-Create a new file with the provided content.
+#### 7. `new_file`
+Creates a new file.
 
 **Parameters**:
 - `absolute_file_path` (str): Path of the new file
-- `text` (str): Content to write to the new file
 
 **Returns**:
 - Operation result with status and id of the content if applicable
@@ -106,7 +118,7 @@ Create a new file with the provided content.
 **Note**:
 - This tool will fail if the current file exists and is not empty
 
-#### 7. `find_line`
+#### 8. `find_line`
 Find lines that match provided text in the current file.
 
 **Parameters**:
@@ -137,7 +149,7 @@ Find lines that match provided text in the current file.
 ## Configuration
 
 Environment variables:
-- `MAX_EDIT_LINES`: Maximum number of lines that can be edited with hash verification (default: 200)
+- `MAX_EDIT_LINES`: Maximum number of lines that can be edited with hash verification (default: 50)
 
 ## Development
 
@@ -198,19 +210,24 @@ The test suite covers:
    - Edge cases like empty files
    - Invalid range handling
 
-3. **overwrite tool**
+3. **select tool**
    - Line range validation
-   - ID verification
+   - Selection validation against max_edit_lines
+   - Selection storage for subsequent operations
+
+4. **overwrite tool**
+   - Verification of selected content using ID
    - Content replacement validation
+   - Syntax checking for Python and JavaScript/React files
    
-4. **delete_file tool**
+5. **delete_file tool**
    - File deletion validation
 
-5. **new_file tool**
+6. **new_file tool**
    - File creation validation
    - Handling existing files
 
-6. **find_line tool**
+7. **find_line tool**
    - Finding text matches in files
    - Handling specific search terms
    - Error handling for non-existent files
@@ -228,15 +245,16 @@ The ID mechanism uses SHA-256 to generate a unique identifier of the file conten
 The main `TextEditorServer` class:
 
 1. Initializes with a FastMCP instance named "text-editor"
-2. Sets a configurable `max_edit_lines` limit (default: 200) from environment variables
+2. Sets a configurable `max_edit_lines` limit (default: 50) from environment variables
 3. Maintains the current file path as state
-4. Registers seven primary tools through FastMCP:
+4. Registers eight primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
    - `skim`: Reads the entire content of a file
-   - `read`: Reads content and generates content IDs
-   - `overwrite`: Replaces text in a specified line range
+   - `read`: Reads text from specified line range
+   - `select`: Selects lines for subsequent overwrite operation
+   - `overwrite`: Replaces previously selected text with new content
    - `delete_file`: Deletes the current file
-   - `new_file`: Creates a new file with content
+   - `new_file`: Creates a new file
    - `find_line`: Finds lines containing specific text
 
 The server runs using FastMCP's stdio transport by default, making it easy to integrate with various clients.

@@ -87,7 +87,7 @@ class TestTextEditorServer:
 
         assert "text" in result
         assert "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n" == result["text"]
-        assert "id" in result
+        # No id in read anymore, only in select
 
     async def test_read_line_range(self, server, temp_file):
         """Test getting a specific range of lines from a file."""
@@ -99,10 +99,17 @@ class TestTextEditorServer:
         result = await read_fn(2, 4)
 
         assert "text" in result
-        assert "id" in result
         assert "Line 2\nLine 3\nLine 4\n" == result["text"]
 
+        # Let's test select functionality here too
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(2, 4)
+
+        assert select_result["text"] == "Line 2\nLine 3\nLine 4\n"
+        assert "id" in select_result
+
         expected_id = calculate_id("Line 2\nLine 3\nLine 4\n", 2, 4)
+        assert expected_id == select_result["id"]
         assert expected_id == result["id"]
 
     @pytest.mark.asyncio
@@ -113,8 +120,14 @@ class TestTextEditorServer:
 
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(1, 2)
+        assert "text" in result
+        assert result["text"] == "Line 1\nLine 2\n"
+
+        # Test select for ID
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(1, 2)
         expected_id = calculate_id("Line 1\nLine 2\n", 1, 2)
-        assert expected_id == result["id"]
+        assert expected_id == select_result["id"]
 
     @pytest.mark.asyncio
     async def test_read_invalid_range(self, server, temp_file):
@@ -172,22 +185,24 @@ class TestTextEditorServer:
             result = await read_fn(1, more_than_max_lines)
 
             assert "text" in result
-            assert (
-                f"len(selected_lines)={more_than_max_lines} > self.max_edit_lines={server.max_edit_lines} so no id."
-                in result["info"]
-            )
             assert len(result["text"].splitlines()) == more_than_max_lines
 
-            result = await read_fn(5, 15)
+            # Test select with max lines
+            select_fn = self.get_tool_fn(server, "select")
+            result = await select_fn(1, more_than_max_lines)
+            assert "error" in result
+            assert (
+                f"Cannot select more than {server.max_edit_lines} lines at once"
+                in result["error"]
+            )
 
+            # Test valid select with fewer lines
+            result = await select_fn(5, 15)
             assert "text" in result
             assert "id" in result
-            assert len(result["text"].splitlines()) == 11
-
+            # Read with range exceeding max_edit_lines
             result = await read_fn(5, server.max_edit_lines + 10)
-
             assert "text" in result
-            assert "id" not in result
             assert len(result["text"].splitlines()) == server.max_edit_lines + 6
 
         finally:
@@ -369,7 +384,7 @@ class TestTextEditorServer:
         """Test overwrite when no file is set."""
         overwrite_fn = self.get_tool_fn(server, "overwrite")
 
-        result = await overwrite_fn(text="New content", start=1, end=2, id="some-id")
+        result = await overwrite_fn(text="New content")
 
         assert "error" in result
         assert "No file path is set" in result["error"]
@@ -380,16 +395,17 @@ class TestTextEditorServer:
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        # First read the content to get the ID
-        read_fn = self.get_tool_fn(server, "read")
-        read_result = await read_fn(2, 4)
+        # First select the content
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(2, 4)
+
+        assert select_result["status"] == "success"
+        assert "id" in select_result
 
         # Now overwrite lines 2-4
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         new_content = "New Line 2\nNew Line 3\nNew Line 4\n"
-        result = await overwrite_fn(
-            text=new_content, start=2, end=4, id=read_result["id"]
-        )
+        result = await overwrite_fn(text=new_content)
 
         assert "status" in result
         assert result["status"] == "success"
@@ -403,27 +419,28 @@ class TestTextEditorServer:
         assert file_content == expected_content
 
     @pytest.mark.asyncio
-    async def test_overwrite_invalid_range(self, server, temp_file):
-        """Test overwrite with invalid line ranges."""
+    async def test_select_invalid_range(self, server, temp_file):
+        """Test select with invalid line ranges."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        select_fn = self.get_tool_fn(server, "select")
 
         # Test with start < 1
-        result = await overwrite_fn(text="New content", start=0, end=2, id="some-id")
+        result = await select_fn(start=0, end=2)
         assert "error" in result
-        assert "line_start must be at least 1" in result["error"]
+        assert "start must be at least 1" in result["error"]
 
         # Test with end > file length
-        result = await overwrite_fn(text="New content", start=1, end=10, id="some-id")
-        assert "error" in result
-        assert "line_end (10) exceeds file length" in result["error"]
+        result = await select_fn(start=1, end=10)
+        # This should now adjust the end line to match file length
+        assert "end" in result
+        assert result["end"] == 5  # Our test file has 5 lines
 
         # Test with start > end
-        result = await overwrite_fn(text="New content", start=4, end=2, id="some-id")
+        result = await select_fn(start=4, end=2)
         assert "error" in result
-        assert "line_start cannot be greater than line_end" in result["error"]
+        assert "start cannot be greater than end" in result["error"]
 
     @pytest.mark.asyncio
     async def test_overwrite_id_verification_failed(self, server, temp_file):
@@ -431,12 +448,19 @@ class TestTextEditorServer:
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        # First select lines 2-3
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(2, 3)
 
-        # Use an incorrect ID
-        result = await overwrite_fn(
-            text="New content", start=2, end=3, id="incorrect-id"
-        )
+        # Modify the file to cause verification failure
+        with open(temp_file, "w") as f:
+            f.write(
+                "Modified Line 1\nModified Line 2\nModified Line 3\nModified Line 4\nModified Line 5\n"
+            )
+
+        # Try to overwrite with the old selection
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        result = await overwrite_fn(text="New content")
 
         assert "error" in result
         assert "id verification failed" in result["error"]
@@ -447,16 +471,18 @@ class TestTextEditorServer:
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        # First read the content to get the ID
-        read_fn = self.get_tool_fn(server, "read")
-        read_result = await read_fn(2, 3)
+        # First select the content
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(2, 3)
+
+        assert select_result["status"] == "success"
 
         # Replace 2 lines with 3 lines
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         new_content = "New Line 2\nExtra Line\nNew Line 3\n"
-        result = await overwrite_fn(
-            text=new_content, start=2, end=3, id=read_result["id"]
-        )
+
+        # Replace 2 lines with 3 lines
+        result = await overwrite_fn(text=new_content)
 
         assert result["status"] == "success"
 
@@ -469,14 +495,13 @@ class TestTextEditorServer:
         )
         assert file_content == expected_content
 
-        # Now read again for new ID
-        read_result = await read_fn(1, 6)
+        # Now select the entire file for the next test
+        select_result = await select_fn(1, 6)
+        assert select_result["status"] == "success"
 
         # Replace 6 lines with 1 line
         new_content = "Single Line\n"
-        result = await overwrite_fn(
-            text=new_content, start=1, end=6, id=read_result["id"]
-        )
+        result = await overwrite_fn(text=new_content)
 
         assert result["status"] == "success"
 
@@ -492,13 +517,15 @@ class TestTextEditorServer:
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        # First read the content to get the ID
-        read_fn = self.get_tool_fn(server, "read")
-        read_result = await read_fn(2, 3)
+        # First select the content
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(2, 3)
+
+        assert select_result["status"] == "success"
 
         # Replace with empty string (remove lines 2-3)
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        result = await overwrite_fn(text="", start=2, end=3, id=read_result["id"])
+        result = await overwrite_fn(text="")
 
         assert result["status"] == "success"
 
@@ -510,8 +537,8 @@ class TestTextEditorServer:
         assert file_content == expected_content
 
     @pytest.mark.asyncio
-    async def test_overwrite_max_lines_exceeded(self, server, temp_file):
-        """Test overwrite with a range exceeding max_edit_lines."""
+    async def test_select_max_lines_exceeded(self, server, temp_file):
+        """Test select with a range exceeding max_edit_lines."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
@@ -525,14 +552,12 @@ class TestTextEditorServer:
         try:
             await set_file_fn(large_file_path)
 
-            overwrite_fn = self.get_tool_fn(server, "overwrite")
-            result = await overwrite_fn(
-                text="New content", start=1, end=server.max_edit_lines + 1, id="some-id"
-            )
+            select_fn = self.get_tool_fn(server, "select")
+            result = await select_fn(start=1, end=server.max_edit_lines + 1)
 
             assert "error" in result
             assert (
-                f"Cannot overwrite more than {server.max_edit_lines} lines at once"
+                f"Cannot select more than {server.max_edit_lines} lines at once"
                 in result["error"]
             )
 
@@ -546,6 +571,12 @@ class TestTextEditorServer:
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
+        # First select the content
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(2, 3)
+
+        assert select_result["status"] == "success"
+
         # Mock open to raise an exception during read
         original_open = open
 
@@ -557,7 +588,7 @@ class TestTextEditorServer:
         monkeypatch.setattr("builtins.open", mock_open_read)
 
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        result = await overwrite_fn(text="New content", start=1, end=3, id="some-id")
+        result = await overwrite_fn(text="New content")
 
         assert "error" in result
         assert "Error reading file" in result["error"]
@@ -569,9 +600,11 @@ class TestTextEditorServer:
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
 
-        # First read the content to get the ID
-        read_fn = self.get_tool_fn(server, "read")
-        read_result = await read_fn(2, 3)
+        # First select the content
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(2, 3)
+
+        assert select_result["status"] == "success"
 
         # Mock open for writing to raise an exception
         original_open = open
@@ -585,9 +618,7 @@ class TestTextEditorServer:
         monkeypatch.setattr("builtins.open", mock_open_write)
 
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        result = await overwrite_fn(
-            text="New content", start=2, end=3, id=read_result["id"]
-        )
+        result = await overwrite_fn(text="New content")
 
         assert "error" in result
         assert "Error writing to file" in result["error"]
@@ -605,17 +636,16 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(temp_path)
 
-            # First read the content to get the ID
-            read_fn = self.get_tool_fn(server, "read")
-            read_result = await read_fn(2, 2)
+            # First select the content
+            select_fn = self.get_tool_fn(server, "select")
+            select_result = await select_fn(2, 2)
+
+            assert select_result["status"] == "success"
 
             # Replace line 2
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             result = await overwrite_fn(
-                text="New Line 2",  # No trailing newline
-                start=2,
-                end=2,
-                id=read_result["id"],
+                text="New Line 2"  # No trailing newline
             )
 
             assert result["status"] == "success"
@@ -646,15 +676,16 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(py_file_path)
 
-            read_fn = self.get_tool_fn(server, "read")
-            read_result = await read_fn(1, 4)
+            # First select the content
+            select_fn = self.get_tool_fn(server, "select")
+            select_result = await select_fn(1, 4)
+
+            assert select_result["status"] == "success"
 
             # Modify with valid Python code
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             new_content = "def greeting(name):\n    return f'Hello, {name}!'\n\nresult = greeting('World')\n"
-            result = await overwrite_fn(
-                text=new_content, start=1, end=4, id=read_result["id"]
-            )
+            result = await overwrite_fn(text=new_content)
 
             assert result["status"] == "success"
             assert "Text overwritten" in result["message"]
@@ -684,15 +715,16 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(py_file_path)
 
-            read_fn = self.get_tool_fn(server, "read")
-            read_result = await read_fn(1, 4)
+            # First select the content
+            select_fn = self.get_tool_fn(server, "select")
+            select_result = await select_fn(1, 4)
+
+            assert select_result["status"] == "success"
 
             # Try to replace with invalid Python code (syntax error)
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             invalid_python = "def broken_function(:\n    print('Missing parenthesis'\n\nresult = broken_function()\n"
-            result = await overwrite_fn(
-                text=invalid_python, start=1, end=4, id=read_result["id"]
-            )
+            result = await overwrite_fn(text=invalid_python)
 
             assert "error" in result
             assert "Python syntax error:" in result["error"]
@@ -732,15 +764,14 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(js_file_path)
 
-            read_fn = self.get_tool_fn(server, "read")
-            read_result = await read_fn(1, 5)
+            # First select the content
+            select_fn = self.get_tool_fn(server, "select")
+            select_result = await select_fn(1, 5)
 
-            # Modify with valid JavaScript code
+            assert select_result["status"] == "success"
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             new_js_content = "function greeting(name) {\n  return `Hello, ${name}!`;\n}\n\nconst result = greeting('World');\n"
-            result = await overwrite_fn(
-                text=new_js_content, start=1, end=5, id=read_result["id"]
-            )
+            result = await overwrite_fn(text=new_js_content)
 
             assert result["status"] == "success"
             assert "Text overwritten" in result["message"]
@@ -780,15 +811,12 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(js_file_path)
 
-            read_fn = self.get_tool_fn(server, "read")
-            read_result = await read_fn(1, 5)
-
-            # Try to replace with invalid JavaScript code
+            # First select the content
+            select_fn = self.get_tool_fn(server, "select")
+            select_result = await select_fn(1, 5)
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             invalid_js = "function broken() {\n  return 'Missing closing bracket;\n}\n\nconst result = broken();\n"
-            result = await overwrite_fn(
-                text=invalid_js, start=1, end=5, id=read_result["id"]
-            )
+            result = await overwrite_fn(text=invalid_js)
 
             assert "error" in result
             assert "JavaScript syntax error:" in result["error"]
@@ -828,15 +856,16 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(jsx_file_path)
 
-            read_fn = self.get_tool_fn(server, "read")
-            read_result = await read_fn(1, 7)
+            # First select the content
+            select_fn = self.get_tool_fn(server, "select")
+            select_result = await select_fn(1, 7)
+
+            assert select_result["status"] == "success"
 
             # Modify with valid JSX code
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             new_jsx_content = "import React from 'react';\n\nfunction Greeting({ name }) {\n  return <div>Hello, {name}!</div>;\n}\n\nexport default Greeting;\n"
-            result = await overwrite_fn(
-                text=new_jsx_content, start=1, end=7, id=read_result["id"]
-            )
+            result = await overwrite_fn(text=new_jsx_content)
 
             assert result["status"] == "success"
             assert "Text overwritten" in result["message"]
@@ -876,15 +905,13 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server, "set_file")
             await set_file_fn(jsx_file_path)
 
-            read_fn = self.get_tool_fn(server, "read")
-            read_result = await read_fn(1, 7)
-
+            # First select the content
+            select_fn = self.get_tool_fn(server, "select")
+            select_result = await select_fn(1, 7)
             # Try to replace with invalid JSX code
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             invalid_jsx = "import React from 'react';\n\nfunction BrokenComponent() {\n  return <div>Missing closing tag<div>;\n}\n\nexport default BrokenComponent;\n"
-            result = await overwrite_fn(
-                text=invalid_jsx, start=1, end=7, id=read_result["id"]
-            )
+            result = await overwrite_fn(text=invalid_jsx)
 
             assert "error" in result
             assert "JavaScript syntax error:" in result["error"]

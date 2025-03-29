@@ -41,7 +41,7 @@ class TextEditorServer:
     This class provides a set of tools for interacting with text files, including:
     - Setting the current file to work with
     - Reading text content from files
-    - Editing file content through separate tools for inserting, removing, and overwriting text
+    - Editing file content through separate tools for selecting and overwriting text
     - Creating new files
     - Deleting files
 
@@ -52,12 +52,18 @@ class TextEditorServer:
         mcp (FastMCP): The MCP server instance for handling tool registrations
         max_edit_lines (int): Maximum number of lines that can be edited with id verification
         current_file_path (str, optional): Path to the currently active file
+        selected_start (int, optional): Start line of the current selection
+        selected_end (int, optional): End line of the current selection
+        selected_id (str, optional): ID of the current selection for verification
     """
 
     def __init__(self):
         self.mcp = FastMCP("text-editor")
         self.max_edit_lines = int(os.getenv("MAX_EDIT_LINES", "50"))
         self.current_file_path = None
+        self.selected_start = None
+        self.selected_end = None
+        self.selected_id = None
 
         self.register_tools()
 
@@ -105,22 +111,14 @@ class TextEditorServer:
         @self.mcp.tool()
         async def read(start: int, end: int) -> Dict[str, Any]:
             """
-            Read text from the current file and get its ID for editing operations.
-
-            This is a key step before any editing operation. The returned ID is
-            required for overwrite operations to ensure content integrity.
-
-            Workflow:
-            1. Call skim() to get the context of the whole file
-            1. Call read(20,30) to get content of the range you want to edit (here lines 20 to 30) and its ID
-            2. Use the ID in subsequent overwrite operations
+            Read text from the current file from start line to end line.
 
             Args:
                 start (int, optional): Start line number (1-based indexing).
                 end (int, optional): End line number (1-based indexing).
 
             Returns:
-                dict: Dictionary containing the text with each line, and lines range id if file has <= self.max_edit_lines lines
+                dict: Dictionary containing the text of each line
             """
             result = {}
 
@@ -142,49 +140,29 @@ class TextEditorServer:
 
                 text = "".join(selected_lines)
                 result["text"] = text
-                if len(selected_lines) <= self.max_edit_lines:
-                    original_text = "".join(selected_lines)
-                    result["id"] = calculate_id(original_text, start, end)
-                else:
-                    result["info"] = (
-                        f"{len(selected_lines)=} > {self.max_edit_lines=} so no id."
-                    )
+
                 return result
 
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
 
         @self.mcp.tool()
-        async def overwrite(
-            text: str,
+        async def select(
             start: int,
             end: int,
-            id: str,
         ) -> Dict[str, Any]:
             """
-            Overwrite a range of lines in the current file with new text.
+            Select a range of lines from the current file for subsequent overwrite operation.
 
+            This validates the selection against max_edit_lines and stores the selection
+            details for use in the overwrite tool.
 
             Args:
-                text (str): New text to overwrite the specified range
                 start (int): Start line number (1-based)
                 end (int): End line number (1-based)
-                id (str): id of the lines in the specified range
 
             Returns:
-                dict: Operation result with status and message
-
-            Notes:
-                - This tool allows replacing a range of lines with new content
-                - The number of new lines can differ from the original range
-                - To remove lines, provide an empty string as the text parameter
-                - The behavior mimics copy-paste: original lines are removed, new lines are
-                  inserted at that position, and any content after the original section
-                  is preserved and will follow the new content
-                - For Python files (.py extension), syntax checking is performed before writing
-                  to ensure the modified code compiles correctly
-                - For JavaScript/React files (.js, .jsx extensions), syntax checking is also performed
-                  using Babel (via npx) to ensure valid JavaScript/JSX syntax before writing changes
+                dict: Dictionary containing the selected text, line range, and ID for verification
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -192,24 +170,88 @@ class TextEditorServer:
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     lines = file.readlines()
+
+                if start < 1:
+                    return {"error": "start must be at least 1."}
+
+                if end > len(lines):
+                    end = len(lines)
+
+                if start > end:
+                    return {"error": "start cannot be greater than end."}
+
+                if end - start + 1 > self.max_edit_lines:
+                    return {
+                        "error": f"Cannot select more than {self.max_edit_lines} lines at once (attempted {end - start + 1} lines)."
+                    }
+
+                selected_lines = lines[start - 1 : end]
+                text = "".join(selected_lines)
+
+                current_id = calculate_id(text, start, end)
+
+                self.selected_start = start
+                self.selected_end = end
+                self.selected_id = current_id
+
+                result = {
+                    "status": "success",
+                    "text": text,
+                    "start": start,
+                    "end": end,
+                    "id": current_id,
+                    "line_count": len(selected_lines),
+                    "message": f"Selected lines {start} to {end} for editing.",
+                }
+
+                return result
+
+            except Exception as e:
+                return {"error": f"Error selecting lines: {str(e)}"}
+
+        @self.mcp.tool()
+        async def overwrite(
+            text: str,
+        ) -> Dict[str, Any]:
+            """
+            Overwrite a range of lines in the current file with new text.
+
+
+            Overwrite previously selected lines.
+
+            Args:
+                text (str): New text to overwrite the selected range
+
+            Returns:
+                dict: Operation result with status and message
+
+            Notes:
+                - This tool allows replacing the previously selected lines with new content
+                - The number of new lines can differ from the original selection
+                - The selection is removed upon successful overwrite
+                - To remove lines, provide an empty string as the text parameter
+                - For Python files (.py extension), syntax checking is performed before writing
+                - For JavaScript/React files (.js, .jsx extensions), syntax checking is also performed
+            """
+            if self.current_file_path is None:
+                return {"error": "No file path is set. Use set_file first."}
+
+            if (
+                self.selected_start is None
+                or self.selected_end is None
+                or self.selected_id is None
+            ):
+                return {"error": "No selection has been made. Use select tool first."}
+
+            try:
+                with open(self.current_file_path, "r", encoding="utf-8") as file:
+                    lines = file.readlines()
             except Exception as e:
                 return {"error": f"Error reading file: {str(e)}"}
 
-            if start < 1:
-                return {"error": "line_start must be at least 1."}
-
-            if end > len(lines):
-                return {
-                    "error": f"line_end ({end}) exceeds file length ({len(lines)})."
-                }
-
-            if start > end:
-                return {"error": "line_start cannot be greater than line_end."}
-
-            if end - start + 1 > self.max_edit_lines:
-                return {
-                    "error": f"Cannot overwrite more than {self.max_edit_lines} lines at once (attempted {end - start + 1} lines)."
-                }
+            start = self.selected_start
+            end = self.selected_end
+            id = self.selected_id
 
             current_content = "".join(lines[start - 1 : end])
 
@@ -303,7 +345,9 @@ class TextEditorServer:
                     "status": "success",
                     "message": f"Text overwritten from line {start} to {end}",
                 }
-
+                self.selected_start = None
+                self.selected_end = None
+                self.selected_id = None
                 return result
             except Exception as e:
                 return {"error": f"Error writing to file: {str(e)}"}
