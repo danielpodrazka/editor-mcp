@@ -56,7 +56,7 @@ class TextEditorServer:
 
     def __init__(self):
         self.mcp = FastMCP("text-editor")
-        self.max_edit_lines = int(os.getenv("MAX_EDIT_LINES", "200"))
+        self.max_edit_lines = int(os.getenv("MAX_EDIT_LINES", "50"))
         self.current_file_path = None
 
         self.register_tools()
