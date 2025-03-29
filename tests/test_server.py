@@ -638,3 +638,263 @@ class TestTextEditorServer:
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_overwrite_python_syntax_check_success(self, server):
+        """Test Python syntax checking in overwrite succeeds with valid Python code."""
+        # Create a temporary Python file with valid code
+        valid_python_content = "def hello():\n    print('Hello, world!')\n\nresult = hello()\n"
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
+            f.write(valid_python_content)
+            py_file_path = f.name
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(py_file_path)
+
+            read_fn = self.get_tool_fn(server, "read")
+            read_result = await read_fn(1, 4)
+
+            # Modify with valid Python code
+            overwrite_fn = self.get_tool_fn(server, "overwrite")
+            new_content = "def greeting(name):\n    return f'Hello, {name}!'\n\nresult = greeting('World')\n"
+            result = await overwrite_fn(
+                text=new_content, start=1, end=4, id=read_result["id"]
+            )
+
+            assert result["status"] == "success"
+            assert "Text overwritten" in result["message"]
+
+            # Verify the file was updated
+            with open(py_file_path, "r") as f:
+                file_content = f.read()
+
+            assert file_content == new_content
+
+        finally:
+            if os.path.exists(py_file_path):
+                os.unlink(py_file_path)
+                
+    @pytest.mark.asyncio
+    async def test_overwrite_python_syntax_check_failure(self, server):
+        """Test Python syntax checking in overwrite fails with invalid Python code."""
+        # Create a temporary Python file with valid code
+        valid_python_content = "def hello():\n    print('Hello, world!')\n\nresult = hello()\n"
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
+            f.write(valid_python_content)
+            py_file_path = f.name
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(py_file_path)
+
+            read_fn = self.get_tool_fn(server, "read")
+            read_result = await read_fn(1, 4)
+
+            # Try to replace with invalid Python code (syntax error)
+            overwrite_fn = self.get_tool_fn(server, "overwrite")
+            invalid_python = "def broken_function(:\n    print('Missing parenthesis'\n\nresult = broken_function()\n"
+            result = await overwrite_fn(
+                text=invalid_python, start=1, end=4, id=read_result["id"]
+            )
+
+            assert "error" in result
+            assert "Python syntax error:" in result["error"]
+
+            # Verify the file was not modified
+            with open(py_file_path, "r") as f:
+                file_content = f.read()
+
+            assert file_content == valid_python_content  # File should remain unchanged
+
+        finally:
+            if os.path.exists(py_file_path):
+                os.unlink(py_file_path)
+                
+    @pytest.mark.asyncio
+    async def test_overwrite_javascript_syntax_check_success(self, server, monkeypatch):
+        """Test JavaScript syntax checking in overwrite succeeds with valid JS code."""
+        # Create a temporary JS file with valid code
+        valid_js_content = "function hello() {\n  return 'Hello, world!';\n}\n\nconst result = hello();\n"
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".js", delete=False) as f:
+            f.write(valid_js_content)
+            js_file_path = f.name
+
+        # Mock the subprocess.run to simulate successful Babel execution
+        def mock_subprocess_run(*args, **kwargs):
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stderr = ""
+                    self.stdout = ""
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(js_file_path)
+
+            read_fn = self.get_tool_fn(server, "read")
+            read_result = await read_fn(1, 5)
+
+            # Modify with valid JavaScript code
+            overwrite_fn = self.get_tool_fn(server, "overwrite")
+            new_js_content = "function greeting(name) {\n  return `Hello, ${name}!`;\n}\n\nconst result = greeting('World');\n"
+            result = await overwrite_fn(
+                text=new_js_content, start=1, end=5, id=read_result["id"]
+            )
+
+            assert result["status"] == "success"
+            assert "Text overwritten" in result["message"]
+
+            # Verify the file was updated
+            with open(js_file_path, "r") as f:
+                file_content = f.read()
+
+            assert file_content == new_js_content
+
+        finally:
+            if os.path.exists(js_file_path):
+                os.unlink(js_file_path)
+                
+    @pytest.mark.asyncio
+    async def test_overwrite_javascript_syntax_check_failure(self, server, monkeypatch):
+        """Test JavaScript syntax checking in overwrite fails with invalid JS code."""
+        # Create a temporary JS file with valid code
+        valid_js_content = "function hello() {\n  return 'Hello, world!';\n}\n\nconst result = hello();\n"
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".js", delete=False) as f:
+            f.write(valid_js_content)
+            js_file_path = f.name
+
+        # Mock the subprocess.run to simulate Babel execution failure
+        def mock_subprocess_run(*args, **kwargs):
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 1
+                    self.stderr = "SyntaxError: Unexpected token (1:19)"
+                    self.stdout = ""
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(js_file_path)
+
+            read_fn = self.get_tool_fn(server, "read")
+            read_result = await read_fn(1, 5)
+
+            # Try to replace with invalid JavaScript code
+            overwrite_fn = self.get_tool_fn(server, "overwrite")
+            invalid_js = "function broken() {\n  return 'Missing closing bracket;\n}\n\nconst result = broken();\n"
+            result = await overwrite_fn(
+                text=invalid_js, start=1, end=5, id=read_result["id"]
+            )
+
+            assert "error" in result
+            assert "JavaScript syntax error:" in result["error"]
+
+            # Verify the file was not modified
+            with open(js_file_path, "r") as f:
+                file_content = f.read()
+
+            assert file_content == valid_js_content  # File should remain unchanged
+
+        finally:
+            if os.path.exists(js_file_path):
+                os.unlink(js_file_path)
+                
+    @pytest.mark.asyncio
+    async def test_overwrite_jsx_syntax_check_success(self, server, monkeypatch):
+        """Test JSX syntax checking in overwrite succeeds with valid React/JSX code."""
+        # Create a temporary JSX file with valid code
+        valid_jsx_content = "import React from 'react';\n\nfunction HelloWorld() {\n  return <div>Hello, world!</div>;\n}\n\nexport default HelloWorld;\n"
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".jsx", delete=False) as f:
+            f.write(valid_jsx_content)
+            jsx_file_path = f.name
+
+        # Mock the subprocess.run to simulate successful Babel execution
+        def mock_subprocess_run(*args, **kwargs):
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stderr = ""
+                    self.stdout = ""
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(jsx_file_path)
+
+            read_fn = self.get_tool_fn(server, "read")
+            read_result = await read_fn(1, 7)
+
+            # Modify with valid JSX code
+            overwrite_fn = self.get_tool_fn(server, "overwrite")
+            new_jsx_content = "import React from 'react';\n\nfunction Greeting({ name }) {\n  return <div>Hello, {name}!</div>;\n}\n\nexport default Greeting;\n"
+            result = await overwrite_fn(
+                text=new_jsx_content, start=1, end=7, id=read_result["id"]
+            )
+
+            assert result["status"] == "success"
+            assert "Text overwritten" in result["message"]
+
+            # Verify the file was updated
+            with open(jsx_file_path, "r") as f:
+                file_content = f.read()
+
+            assert file_content == new_jsx_content
+
+        finally:
+            if os.path.exists(jsx_file_path):
+                os.unlink(jsx_file_path)
+                
+    @pytest.mark.asyncio
+    async def test_overwrite_jsx_syntax_check_failure(self, server, monkeypatch):
+        """Test JSX syntax checking in overwrite fails with invalid React/JSX code."""
+        # Create a temporary JSX file with valid code
+        valid_jsx_content = "import React from 'react';\n\nfunction HelloWorld() {\n  return <div>Hello, world!</div>;\n}\n\nexport default HelloWorld;\n"
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".jsx", delete=False) as f:
+            f.write(valid_jsx_content)
+            jsx_file_path = f.name
+
+        # Mock the subprocess.run to simulate Babel execution failure
+        def mock_subprocess_run(*args, **kwargs):
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 1
+                    self.stderr = "SyntaxError: Unexpected token (4:10)"
+                    self.stdout = ""
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(jsx_file_path)
+
+            read_fn = self.get_tool_fn(server, "read")
+            read_result = await read_fn(1, 7)
+
+            # Try to replace with invalid JSX code
+            overwrite_fn = self.get_tool_fn(server, "overwrite")
+            invalid_jsx = "import React from 'react';\n\nfunction BrokenComponent() {\n  return <div>Missing closing tag<div>;\n}\n\nexport default BrokenComponent;\n"
+            result = await overwrite_fn(
+                text=invalid_jsx, start=1, end=7, id=read_result["id"]
+            )
+
+            assert "error" in result
+            assert "JavaScript syntax error:" in result["error"]
+
+            # Verify the file was not modified
+            with open(jsx_file_path, "r") as f:
+                file_content = f.read()
+
+            assert file_content == valid_jsx_content  # File should remain unchanged
+
+        finally:
+            if os.path.exists(jsx_file_path):
+                os.unlink(jsx_file_path)
