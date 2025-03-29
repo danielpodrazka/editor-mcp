@@ -1,6 +1,9 @@
 import hashlib
 import os
 import io
+import importlib.util
+import subprocess
+import tempfile
 from typing import Optional, Dict, Any
 import black
 from black.report import NothingChanged
@@ -182,6 +185,8 @@ class TextEditorServer:
                   is preserved and will follow the new content
                 - For Python files (.py extension), syntax checking is performed before writing
                   to ensure the modified code compiles correctly
+                - For JavaScript/React files (.js, .jsx extensions), syntax checking is also performed
+                  using Babel (via npx) to ensure valid JavaScript/JSX syntax before writing changes
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -240,6 +245,57 @@ class TextEditorServer:
                 except Exception as e:
                     if not isinstance(e, NothingChanged):
                         return {"error": f"Black check raised {type(e)}: {str(e)}"}
+
+            elif self.current_file_path.endswith((".jsx", ".js")):
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".jsx", delete=False
+                ) as temp:
+                    temp_path = temp.name
+                    temp.writelines(modified_lines)
+
+                try:
+                    presets = (
+                        ["@babel/preset-react"]
+                        if self.current_file_path.endswith(".jsx")
+                        else ["@babel/preset-env"]
+                    )
+
+                    cmd = [
+                        "npx",
+                        "babel",
+                        "--presets",
+                        ",".join(presets),
+                        "--no-babelrc",
+                        temp_path,
+                        "--out-file",
+                        "/dev/null",  # Output to nowhere, we just want to check syntax
+                    ]
+
+                    # Execute Babel to transform (which validates syntax)
+                    process = subprocess.run(cmd, capture_output=True, text=True)
+
+                    if process.returncode != 0:
+                        error_output = process.stderr
+
+                        filtered_lines = []
+                        for line in error_output.split("\n"):
+                            if "node_modules/@babel" not in line:
+                                filtered_lines.append(line)
+
+                        filtered_error = "\n".join(filtered_lines).strip()
+
+                        if not filtered_error:
+                            filtered_error = "JavaScript syntax error detected"
+
+                        return {"error": f"JavaScript syntax error: {filtered_error}"}
+
+                except Exception as e:
+                    os.unlink(temp_path)
+                    return {"error": f"Error checking JavaScript syntax: {str(e)}"}
+
+                finally:
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
 
             try:
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
