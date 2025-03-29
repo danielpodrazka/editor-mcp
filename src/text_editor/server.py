@@ -1,7 +1,9 @@
 import hashlib
 import os
+import io
 from typing import Optional, Dict, Any
-
+import black
+from black.report import NothingChanged
 from mcp.server.fastmcp import FastMCP
 
 
@@ -178,6 +180,8 @@ class TextEditorServer:
                 - The behavior mimics copy-paste: original lines are removed, new lines are
                   inserted at that position, and any content after the original section
                   is preserved and will follow the new content
+                - For Python files (.py extension), syntax checking is performed before writing
+                  to ensure the modified code compiles correctly
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -222,6 +226,20 @@ class TextEditorServer:
             before = lines[: start - 1]
             after = lines[end:]
             modified_lines = before + new_lines + after
+
+            if self.current_file_path.endswith(".py"):
+                full_content = "".join(modified_lines)
+                try:
+                    black.format_file_contents(
+                        full_content,
+                        fast=True,
+                        mode=black.Mode(),
+                    )
+                except black.InvalidInput as e:
+                    return {"error": f"Python syntax error: {str(e)}"}
+                except Exception as e:
+                    if not isinstance(e, NothingChanged):
+                        return {"error": f"Black check raised {type(e)}: {str(e)}"}
 
             try:
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
