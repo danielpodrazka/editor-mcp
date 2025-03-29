@@ -268,18 +268,17 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def new_file(
-            absolute_file_path: str, text: str, overwriting_existing_file: bool = False
+            planning_to_overwrite_existing_file: bool, absolute_file_path: str
         ) -> Dict[str, Any]:
             """
-            Create a new file with the provided content.
+            Create a new file.
 
             This tool should be used when you want to create a new file.
             The file must not exist or be empty for this operation to succeed.
 
             Args:
+                planning_to_overwrite_existing_file (bool): Should be False. You aren't allowed to overwrite whole files.
                 absolute_file_path (str): Path of the new file
-                text (str): Content to write to the new file
-                overwriting_existing_file (bool): Defaults to False. You can't overwrite files, so if you try to, the tool will fail.
             Returns:
                 dict: Operation result with status and id of the content if applicable
 
@@ -287,9 +286,9 @@ class TextEditorServer:
                 - This tool will fail if the current file exists and is not empty.
                 - Use set_file first to specify the file path.
             """
-            if overwriting_existing_file:
+            if planning_to_overwrite_existing_file:
                 return {
-                    "error": "Overwriting is not allowed. Please edit file in chunks."
+                    "error": "Overwriting is not allowed. Please edit the existing file in chunks instead."
                 }
             self.current_file_path = absolute_file_path
 
@@ -302,12 +301,15 @@ class TextEditorServer:
                 }
 
             try:
+                text = "# NEW_FILE - REMOVE THIS HEADER"
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
                     file.write(text)
 
                 result = {
                     "status": "success",
+                    "text": text,
                     "message": "File created successfully",
+                    "current_file_path": self.current_file_path,
                 }
                 if len(text.splitlines()) <= self.max_edit_lines:
                     result["id"] = calculate_id(text)
