@@ -340,7 +340,7 @@ class TextEditorServer:
         @self.mcp.tool()
         async def new_file(absolute_file_path: str) -> Dict[str, Any]:
             """
-            Create a new file.
+            Creates a new file.
 
             This tool should be used when you want to create a new file.
             The file must not exist or be empty for this operation to succeed.
@@ -372,11 +372,9 @@ class TextEditorServer:
                 result = {
                     "status": "success",
                     "text": text,
-                    "message": "File created successfully",
                     "current_file_path": self.current_file_path,
+                    "id": calculate_id(text, 1, 1),
                 }
-                if len(text.splitlines()) <= self.max_edit_lines:
-                    result["id"] = calculate_id(text)
 
                 return result
             except Exception as e:
