@@ -194,7 +194,6 @@ class TestTextEditorServer:
             if os.path.exists(large_file_path):
                 os.unlink(large_file_path)
 
-    @pytest.mark.skip("new_file is disabled")
     @pytest.mark.asyncio
     async def test_new_file(self, server, empty_temp_file):
         """Test new_file functionality."""
@@ -203,20 +202,14 @@ class TestTextEditorServer:
         await set_file_fn(empty_temp_file)
 
         new_file_fn = self.get_tool_fn(server, "new_file")
-        content = "This is a test file.\nWith multiple lines.\nThree lines total."
-        result = await new_file_fn(empty_temp_file, content)
+        result = await new_file_fn(empty_temp_file)
 
         assert result["status"] == "success"
         assert "id" in result
 
-        with open(empty_temp_file, "r") as file:
-            file_content = file.read()
-        assert file_content == content
-
-        result = await new_file_fn(empty_temp_file, "This should fail.")
+        result = await new_file_fn(empty_temp_file)
         assert "error" in result
 
-    @pytest.mark.skip("delete_file is disabled")
     @pytest.mark.asyncio
     async def test_delete_file(self, server):
         """Test delete_file tool."""
@@ -252,7 +245,6 @@ class TestTextEditorServer:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
 
-    @pytest.mark.skip("delete_file is disabled")
     @pytest.mark.asyncio
     async def test_delete_file_permission_error(self, server, monkeypatch):
         """Test delete_file with permission error."""
@@ -643,7 +635,9 @@ class TestTextEditorServer:
     async def test_overwrite_python_syntax_check_success(self, server):
         """Test Python syntax checking in overwrite succeeds with valid Python code."""
         # Create a temporary Python file with valid code
-        valid_python_content = "def hello():\n    print('Hello, world!')\n\nresult = hello()\n"
+        valid_python_content = (
+            "def hello():\n    print('Hello, world!')\n\nresult = hello()\n"
+        )
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
             f.write(valid_python_content)
             py_file_path = f.name
@@ -674,12 +668,14 @@ class TestTextEditorServer:
         finally:
             if os.path.exists(py_file_path):
                 os.unlink(py_file_path)
-                
+
     @pytest.mark.asyncio
     async def test_overwrite_python_syntax_check_failure(self, server):
         """Test Python syntax checking in overwrite fails with invalid Python code."""
         # Create a temporary Python file with valid code
-        valid_python_content = "def hello():\n    print('Hello, world!')\n\nresult = hello()\n"
+        valid_python_content = (
+            "def hello():\n    print('Hello, world!')\n\nresult = hello()\n"
+        )
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
             f.write(valid_python_content)
             py_file_path = f.name
@@ -710,7 +706,7 @@ class TestTextEditorServer:
         finally:
             if os.path.exists(py_file_path):
                 os.unlink(py_file_path)
-                
+
     @pytest.mark.asyncio
     async def test_overwrite_javascript_syntax_check_success(self, server, monkeypatch):
         """Test JavaScript syntax checking in overwrite succeeds with valid JS code."""
@@ -727,6 +723,7 @@ class TestTextEditorServer:
                     self.returncode = 0
                     self.stderr = ""
                     self.stdout = ""
+
             return MockCompletedProcess()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
@@ -757,7 +754,7 @@ class TestTextEditorServer:
         finally:
             if os.path.exists(js_file_path):
                 os.unlink(js_file_path)
-                
+
     @pytest.mark.asyncio
     async def test_overwrite_javascript_syntax_check_failure(self, server, monkeypatch):
         """Test JavaScript syntax checking in overwrite fails with invalid JS code."""
@@ -774,6 +771,7 @@ class TestTextEditorServer:
                     self.returncode = 1
                     self.stderr = "SyntaxError: Unexpected token (1:19)"
                     self.stdout = ""
+
             return MockCompletedProcess()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
@@ -804,7 +802,7 @@ class TestTextEditorServer:
         finally:
             if os.path.exists(js_file_path):
                 os.unlink(js_file_path)
-                
+
     @pytest.mark.asyncio
     async def test_overwrite_jsx_syntax_check_success(self, server, monkeypatch):
         """Test JSX syntax checking in overwrite succeeds with valid React/JSX code."""
@@ -821,6 +819,7 @@ class TestTextEditorServer:
                     self.returncode = 0
                     self.stderr = ""
                     self.stdout = ""
+
             return MockCompletedProcess()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
@@ -851,7 +850,7 @@ class TestTextEditorServer:
         finally:
             if os.path.exists(jsx_file_path):
                 os.unlink(jsx_file_path)
-                
+
     @pytest.mark.asyncio
     async def test_overwrite_jsx_syntax_check_failure(self, server, monkeypatch):
         """Test JSX syntax checking in overwrite fails with invalid React/JSX code."""
@@ -868,6 +867,7 @@ class TestTextEditorServer:
                     self.returncode = 1
                     self.stderr = "SyntaxError: Unexpected token (4:10)"
                     self.stdout = ""
+
             return MockCompletedProcess()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)

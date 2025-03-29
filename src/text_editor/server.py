@@ -308,6 +308,7 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error writing to file: {str(e)}"}
 
+        @self.mcp.tool()
         async def delete_file() -> Dict[str, Any]:
             """
             Delete the currently set file.
@@ -336,9 +337,8 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error deleting file: {str(e)}"}
 
-        async def new_file(
-            planning_to_overwrite_existing_file: bool, absolute_file_path: str
-        ) -> Dict[str, Any]:
+        @self.mcp.tool()
+        async def new_file(absolute_file_path: str) -> Dict[str, Any]:
             """
             Create a new file.
 
@@ -346,7 +346,6 @@ class TextEditorServer:
             The file must not exist or be empty for this operation to succeed.
 
             Args:
-                planning_to_overwrite_existing_file (bool): Should be False. You aren't allowed to overwrite whole files.
                 absolute_file_path (str): Path of the new file
             Returns:
                 dict: Operation result with status and id of the content if applicable
@@ -355,10 +354,6 @@ class TextEditorServer:
                 - This tool will fail if the current file exists and is not empty.
                 - Use set_file first to specify the file path.
             """
-            if planning_to_overwrite_existing_file:
-                return {
-                    "error": "Overwriting is not allowed. Please edit the existing file in chunks instead."
-                }
             self.current_file_path = absolute_file_path
 
             if (
