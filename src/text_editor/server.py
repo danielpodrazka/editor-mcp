@@ -612,6 +612,16 @@ class TextEditorServer:
         self.mcp.run(transport="stdio")
 
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the application.
+    
+    This function is used both for direct execution and 
+    when the package is installed via UVX, allowing the 
+    application to be run using the `editor-mcp` command.
+    """
     server = TextEditorServer()
     server.run()
+
+
+if __name__ == "__main__":
+    main()

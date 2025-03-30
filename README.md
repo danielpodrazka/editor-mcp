@@ -17,6 +17,52 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 - **Search Operations**: Find lines containing specific text with line numbers and IDs
 ## Installation
 
+### Easy Installation with UVX (Recommended)
+
+The easiest way to install the MCP Text Editor is using the provided installation script:
+
+```bash
+# Clone the repository
+git clone https://github.com/danielpodrazka/editor-mcp.git
+cd editor-mcp
+
+# Run the installation script
+chmod +x install.sh
+./install.sh
+```
+
+This script will:
+1. Check if UVX is installed and install it if necessary
+2. Install the MCP Text Editor in development mode
+3. Make the `editor-mcp` command available in your PATH
+
+### Manual Installation
+
+#### Using UVX
+
+```bash
+# Install directly from GitHub
+uvx install git+https://github.com/danielpodrazka/editor-mcp.git
+
+# Or install from a local clone
+git clone https://github.com/danielpodrazka/editor-mcp.git
+cd editor-mcp
+uvx install -e .
+```
+
+#### Using Traditional pip
+
+```bash
+pip install git+https://github.com/danielpodrazka/editor-mcp.git
+
+# Or from a local clone
+git clone https://github.com/danielpodrazka/editor-mcp.git
+cd editor-mcp
+pip install -e .
+```
+
+#### Using Requirements (Legacy)
+
 Install from the lock file:
 ```bash
 uv pip install -r requirements.lock
@@ -31,8 +77,51 @@ uv pip compile requirements.in -o requirements.lock
 
 ### Starting the Server
 
+After installation, you can start the MCP Text Editor server using one of these methods:
+
 ```bash
+# Using the installed script
+editor-mcp
+
+# Or using the Python module
 python -m text_editor.server
+```
+
+### MCP Configuration
+
+You can add the MCP Text Editor to your MCP configuration file:
+
+```json
+{
+  "mcpServers": {
+     "text-editor": {
+       "command": "editor-mcp",
+       "env": {
+         "MAX_EDIT_LINES": "100",
+         "ENABLE_JS_SYNTAX_CHECK": "0"
+       }
+     }
+  }
+}
+
+"MAX_EDIT_LINES": "100" - The LLM won't be able to overwrite more than 100 lines at a time (default is 50)
+"ENABLE_JS_SYNTAX_CHECK": "0" - When editing Javascript/React code, the changes won't be checked for syntax issues
+```
+### Sample MCP config entry when building from source
+
+```json
+{
+  "mcpServers": {
+     "text-editor": {
+       "command": "/home/daniel/pp/venvs/editor-mcp/bin/python",
+       "args": ["/home/daniel/pp/editor-mcp/src/text_editor/server.py"],
+        "env": {
+          "MAX_EDIT_LINES": "100",
+          "ENABLE_JS_SYNTAX_CHECK": "0"
+        }
+     }
+  }
+}
 ```
 
 ### Available Tools
@@ -184,7 +273,7 @@ Environment variables:
 
 ### Prerequisites
 
-The mcp-text-editor requires:
+The editor-mcp requires:
 - Python 3.7+
 - FastMCP package
 - black (for Python code formatting checks)
@@ -305,21 +394,3 @@ If you encounter issues:
 5. Confirm ID verification by reading content before attempting to edit it
 
 - Each test provides a detailed message when it fails
-
-
-## Sample MCP config entry with disabled syntax checks for Javascript
-
-```json
-{
-  "mcpServers": {
-     "text-editor": {
-       "command": "/home/daniel/pp/venvs/mcp-text-editor/bin/python",
-       "args": ["/home/daniel/pp/mcp-text-editor/src/text_editor/server.py"],
-        "env": {
-          "MAX_EDIT_LINES": "100",
-          "ENABLE_JS_SYNTAX_CHECK": "0"
-        }
-     }
-  }
-}
-```
