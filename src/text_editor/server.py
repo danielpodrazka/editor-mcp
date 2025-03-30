@@ -86,8 +86,8 @@ class TextEditorServer:
 
     This class provides a set of tools for interacting with text files, including:
     - Setting the current file to work with
-    - Reading text content from files
-    - Editing file content through separate tools for selecting and overwriting text
+    - Reading file content as structured line dictionaries
+    - Editing file content through a two-step process of selecting lines and overwriting with new content
     - Creating new files
     - Deleting files
 
@@ -154,7 +154,13 @@ class TextEditorServer:
         @self.mcp.tool()
         async def skim() -> Dict[str, Any]:
             """
-            Read full text from the current file. Each line is prefixed its line number. Good step after set_file.
+            Read full text from the current file. Each line is indexed by its line number as a dictionary.
+            
+            Returns:
+                dict: Dictionary containing:
+                    - lines (dict): Lines with line numbers as keys
+                    - total_lines (int): Total number of lines in the file
+                    - max_edit_lines (int): Maximum number of lines that can be edited at once
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -175,14 +181,18 @@ class TextEditorServer:
         @self.mcp.tool()
         async def read(start: int, end: int) -> Dict[str, Any]:
             """
-            Read text from the current file from start line to end line.
+            Read lines from the current file from start line to end line, returning them in a dictionary
+            where keys are line numbers and values are the line contents.
 
             Args:
                 start (int, optional): Start line number (1-based indexing).
                 end (int, optional): End line number (1-based indexing).
 
             Returns:
-                dict: Dictionary containing the lines with their line numbers
+                dict: Dictionary containing:
+                    - lines (dict): Lines with line numbers as keys
+                    - start_line (int): First line number in the range
+                    - end_line (int): Last line number in the range
             """
             result = {}
 
@@ -231,7 +241,14 @@ class TextEditorServer:
                 end (int): End line number (1-based)
 
             Returns:
-                dict: Dictionary containing the selected lines, line range, and ID for verification
+                dict: Dictionary containing:
+                    - status (str): Success status of the operation
+                    - lines (list): Selected line contents without line numbers
+                    - start (int): Start line number of the selection
+                    - end (int): End line number of the selection
+                    - id (str): Unique identifier for content verification
+                    - line_count (int): Number of lines selected
+                    - message (str): Human-readable success message
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}

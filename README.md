@@ -142,12 +142,17 @@ Sets the current file to work with.
 Reads full text from the current file. Each line is prefixed with its line number.
 
 **Returns**:
-- Dictionary containing the complete text of the file with line numbers prefixed, total number of lines, and the max edit lines setting
+- Dictionary containing lines with their line numbers as keys, total number of lines, and the max edit lines setting
 
 **Example output**:
 ```
 {
-  "text": "   1| def hello():\n   2|     print(\"Hello, world!\")\n   3| \n   4| hello()",
+  "lines": {
+    "1": "def hello():",
+    "2": "    print(\"Hello, world!\")",
+    "3": "",
+    "4": "hello()"
+  },
   "total_lines": 4,
   "max_edit_lines": 50
 }
@@ -161,12 +166,17 @@ Reads text from the current file from start line to end line.
 - `end` (int): End line number (1-based indexing)
 
 **Returns**:
-- Dictionary containing the text of each line prefixed with its line number
+- Dictionary containing lines with their line numbers as keys, along with start and end line information
 
 **Example output**:
 ```
 {
-  "text": "   1| def hello():\n   2|     print(\"Hello, world!\")\n   3| \n   4| hello()",
+  "lines": {
+    "1": "def hello():",
+    "2": "    print(\"Hello, world!\")",
+    "3": "",
+    "4": "hello()"
+  },
   "start_line": 1,
   "end_line": 4
 }
@@ -180,7 +190,7 @@ Select a range of lines from the current file for subsequent overwrite operation
 - `end` (int): End line number (1-based)
 
 **Returns**:
-- Dictionary containing the selected text, line range, and ID for verification
+- Dictionary containing the selected lines, line range, and ID for verification
 
 **Note**:
 - This tool validates the selection against max_edit_lines
@@ -191,7 +201,7 @@ Select a range of lines from the current file for subsequent overwrite operation
 Prepare to overwrite a range of lines in the current file with new text.
 
 **Parameters**:
-- `text` (str): New text to overwrite the selected range
+- `new_lines` (list): List of new lines to overwrite the selected range
 
 **Returns**:
 - Diff preview showing the proposed changes
@@ -375,10 +385,10 @@ The main `TextEditorServer` class:
 3. Maintains the current file path as state
 4. Registers nine primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
-   - `skim`: Reads the entire content of a file
-   - `read`: Reads text from specified line range
+   - `skim`: Reads the entire content of a file, returning a dictionary of line numbers to line text
+   - `read`: Reads lines from specified line range, returning a structured dictionary of line content
    - `select`: Selects lines for subsequent overwrite operation
-   - `overwrite`: Prepares diff preview for changing content
+   - `overwrite`: Takes a list of new lines and prepares diff preview for changing content
    - `decide`: Applies or cancels pending changes
    - `delete_file`: Deletes the current file
    - `new_file`: Creates a new file
