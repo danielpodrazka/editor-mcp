@@ -85,6 +85,20 @@ def generate_diff_preview(
     return "\n".join(diff_lines)
 
 
+def format_line(line_number: int, line_text: str) -> str:
+    """
+    Format a line with its line number for display.
+
+    Args:
+        line_number (int): The line number (1-based)
+        line_text (str): The text content of the line
+
+    Returns:
+        str: Formatted string with line number and text
+    """
+    return f"{line_number:4d}| {line_text.rstrip()}"
+
+
 class TextEditorServer:
     """
     A server implementation for a text editor application using FastMCP.
@@ -156,13 +170,19 @@ class TextEditorServer:
         @self.mcp.tool()
         async def skim() -> Dict[str, Any]:
             """
-            Read full text from the current file. Good step after set_file.
+            Read full text from the current file. Each line is prefixed its line number. Good step after set_file.
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
             with open(self.current_file_path, "r", encoding="utf-8") as file:
                 lines = file.readlines()
-                text = "".join(lines)
+
+                # Format lines with line numbers
+                formatted_lines = []
+                for i, line in enumerate(lines, 1):
+                    formatted_lines.append(format_line(i, line))
+
+                text = "\n".join(formatted_lines)
             return {
                 "text": text,
                 "total_lines": len(lines),
@@ -179,7 +199,7 @@ class TextEditorServer:
                 end (int, optional): End line number (1-based indexing).
 
             Returns:
-                dict: Dictionary containing the text of each line
+                dict: Dictionary containing the text of each line prefixed with its line number
             """
             result = {}
 
@@ -199,8 +219,15 @@ class TextEditorServer:
 
                 selected_lines = lines[start - 1 : end]
 
-                text = "".join(selected_lines)
-                result["text"] = text
+                formatted_lines = []
+                for i, line in enumerate(selected_lines, start):
+                    formatted_lines.append(format_line(i, line))
+
+                formatted_text = "\n".join(formatted_lines)
+
+                result["text"] = formatted_text
+                result["start_line"] = start
+                result["end_line"] = end
 
                 return result
 
