@@ -403,7 +403,4 @@ If you encounter issues:
 1. Check file permissions
 2. Verify that the file paths are absolute
 3. Ensure the environment is using Python 3.7+
-4. Validate line numbers (they are 1-based, not 0-based)
-5. Confirm ID verification by reading content before attempting to edit it
 
-- Each test provides a detailed message when it fails
