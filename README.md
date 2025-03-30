@@ -434,3 +434,7 @@ If you encounter issues:
 2. Verify that the file paths are absolute
 3. Ensure the environment is using Python 3.7+
 
+
+## Inspiration
+
+Inspired by a similar project: https://github.com/tumf/mcp-text-editor, which at first I forked, however I decided to rewrite the whole codebase from scratch so only the general idea stayed the same.
