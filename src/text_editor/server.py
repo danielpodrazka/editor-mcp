@@ -2,7 +2,7 @@ import hashlib
 import os
 import subprocess
 import tempfile
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union, Literal
 import black
 from black.report import NothingChanged
 from mcp.server.fastmcp import FastMCP
@@ -120,6 +120,7 @@ class TextEditorServer:
     Attributes:
         mcp (FastMCP): The MCP server instance for handling tool registrations
         max_edit_lines (int): Maximum number of lines that can be edited with id verification
+        enable_js_syntax_check (bool): Whether JavaScript syntax checking is enabled
         current_file_path (str, optional): Path to the currently active file
         selected_start (int, optional): Start line of the current selection
         selected_end (int, optional): End line of the current selection
@@ -132,11 +133,13 @@ class TextEditorServer:
     def __init__(self):
         self.mcp = FastMCP("text-editor")
         self.max_edit_lines = int(os.getenv("MAX_EDIT_LINES", "50"))
+        self.enable_js_syntax_check = os.getenv(
+            "ENABLE_JS_SYNTAX_CHECK", "1"
+        ).lower() in ["1", "true", "yes"]
         self.current_file_path = None
         self.selected_start = None
         self.selected_end = None
         self.selected_id = None
-        # Attributes for pending changes
         self.pending_modified_lines = None
         self.pending_diff = None
 
@@ -318,7 +321,8 @@ class TextEditorServer:
                 - This tool allows replacing the previously selected lines with new content
                 - The number of new lines can differ from the original selection
                 - For Python files (.py extension), syntax checking is performed before writing
-                - For JavaScript/React files (.js, .jsx extensions), syntax checking is also performed
+                - For JavaScript/React files (.js, .jsx extensions), syntax checking is optional
+                  and controlled by the ENABLE_JS_SYNTAX_CHECK environment variable
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -373,7 +377,9 @@ class TextEditorServer:
                     if not isinstance(e, NothingChanged):
                         return {"error": f"Black check raised {type(e)}: {str(e)}"}
 
-            elif self.current_file_path.endswith((".jsx", ".js")):
+            elif self.enable_js_syntax_check and self.current_file_path.endswith(
+                (".jsx", ".js")
+            ):
                 with tempfile.NamedTemporaryFile(
                     mode="w", suffix=".jsx", delete=False
                 ) as temp:

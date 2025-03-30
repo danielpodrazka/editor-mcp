@@ -111,7 +111,7 @@ Prepare to overwrite a range of lines in the current file with new text.
 - This tool allows replacing the previously selected lines with new content
 - The number of new lines can differ from the original selection
 - For Python files (.py extension), syntax checking is performed before writing
-- For JavaScript/React files (.js, .jsx extensions), syntax checking is also performed
+- For JavaScript/React files (.js, .jsx extensions), syntax checking is optional and can be disabled via the `ENABLE_JS_SYNTAX_CHECK` environment variable
 
 #### 6. `decide`
 Apply or cancel pending changes from the overwrite operation.
@@ -176,6 +176,9 @@ Find lines that match provided text in the current file.
 
 Environment variables:
 - `MAX_EDIT_LINES`: Maximum number of lines that can be edited with hash verification (default: 50)
+- `ENABLE_JS_SYNTAX_CHECK`: Controls whether JavaScript/JSX syntax checking is enabled (default: 1)
+  - Set to "0", "false", or "no" to disable JavaScript syntax checking
+  - Useful if you don't have Babel and related dependencies installed
 
 ## Development
 
@@ -304,7 +307,7 @@ If you encounter issues:
 - Each test provides a detailed message when it fails
 
 
-## Sample MCP config entry
+## Sample MCP config entry with disabled syntax checks for Javascript
 
 ```json
 {
@@ -313,7 +316,8 @@ If you encounter issues:
        "command": "/home/daniel/pp/venvs/mcp-text-editor/bin/python",
        "args": ["/home/daniel/pp/mcp-text-editor/src/text_editor/server.py"],
         "env": {
-          "MAX_EDIT_LINES": "100"
+          "MAX_EDIT_LINES": "100",
+          "ENABLE_JS_SYNTAX_CHECK": "0"
         }
      }
   }
