@@ -155,7 +155,7 @@ class TextEditorServer:
         async def skim() -> Dict[str, Any]:
             """
             Read full text from the current file. Each line is indexed by its line number as a dictionary.
-            
+
             Returns:
                 dict: Dictionary containing:
                     - lines (dict): Lines with line numbers as keys
@@ -243,7 +243,7 @@ class TextEditorServer:
             Returns:
                 dict: Dictionary containing:
                     - status (str): Success status of the operation
-                    - lines (list): Selected line contents without line numbers
+                    - lines (list): Selected line contents
                     - start (int): Start line number of the selection
                     - end (int): End line number of the selection
                     - id (str): Unique identifier for content verification
