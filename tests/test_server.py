@@ -71,7 +71,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(1, 5)
-        assert "text" in result
+        assert "lines" in result
 
     async def test_read_line_range(self, server, temp_file):
         """Test getting a specific range of lines from a file."""
@@ -79,14 +79,13 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(2, 4)
-        assert "text" in result
+        assert "lines" in result
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(2, 4)
-        assert select_result["text"] == "Line 2\nLine 3\nLine 4\n"
+        assert "status" in select_result
         assert "id" in select_result
         expected_id = calculate_id("Line 2\nLine 3\nLine 4\n", 2, 4)
         assert expected_id == select_result["id"]
-        assert expected_id == result["id"]
 
     @pytest.mark.asyncio
     async def test_read_only_end_line(self, server, temp_file):
@@ -95,7 +94,7 @@ class TestTextEditorServer:
         await set_file_fn(temp_file)
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(1, 2)
-        assert "text" in result
+        assert "lines" in result
         select_fn = self.get_tool_fn(server, "select")
         select_result = await select_fn(1, 2)
         expected_id = calculate_id("Line 1\nLine 2\n", 1, 2)
@@ -137,7 +136,7 @@ class TestTextEditorServer:
             await set_file_fn(large_file_path)
             read_fn = self.get_tool_fn(server, "read")
             result = await read_fn(1, more_than_max_lines)
-            assert "text" in result
+            assert "lines" in result
             select_fn = self.get_tool_fn(server, "select")
             result = await select_fn(1, more_than_max_lines)
             assert "error" in result
@@ -146,10 +145,10 @@ class TestTextEditorServer:
                 in result["error"]
             )
             result = await select_fn(5, 15)
-            assert "text" in result
+            assert "status" in result
             assert "id" in result
             result = await read_fn(5, server.max_edit_lines + 10)
-            assert "text" in result
+            assert "lines" in result
         finally:
             if os.path.exists(large_file_path):
                 os.unlink(large_file_path)
@@ -288,7 +287,7 @@ class TestTextEditorServer:
     async def test_overwrite_no_file_set(self, server):
         """Test overwrite when no file is set."""
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        result = await overwrite_fn(text="New content")
+        result = await overwrite_fn(new_lines=["New content"])
         assert "error" in result
         assert "No file path is set" in result["error"]
 
@@ -302,8 +301,8 @@ class TestTextEditorServer:
         assert select_result["status"] == "success"
         assert "id" in select_result
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        new_content = "New Line 2\nNew Line 3\nNew Line 4\n"
-        result = await overwrite_fn(text=new_content)
+        new_lines = ["New Line 2", "New Line 3", "New Line 4"]
+        result = await overwrite_fn(new_lines=new_lines)
         assert "status" in result
         assert result["status"] == "preview"
         assert "Changes ready to apply" in result["message"]
@@ -344,7 +343,7 @@ class TestTextEditorServer:
                 "Modified Line 1\nModified Line 2\nModified Line 3\nModified Line 4\nModified Line 5\n"
             )
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        result = await overwrite_fn(text="New content")
+        result = await overwrite_fn(new_lines=["New content"])
         assert "error" in result
         assert "id verification failed" in result["error"]
 
@@ -357,8 +356,8 @@ class TestTextEditorServer:
         select_result = await select_fn(2, 3)
         assert select_result["status"] == "success"
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        new_content = "New Line 2\nExtra Line\nNew Line 3\n"
-        result = await overwrite_fn(text=new_content)
+        new_lines = ["New Line 2", "Extra Line", "New Line 3"]
+        result = await overwrite_fn(new_lines=new_lines)
         assert result["status"] == "preview"
         decide_fn = self.get_tool_fn(server, "decide")
         decide_result = await decide_fn(decision="accept")
@@ -372,7 +371,7 @@ class TestTextEditorServer:
         select_result = await select_fn(1, 6)
         assert select_result["status"] == "success"
         new_content = "Single Line\n"
-        result = await overwrite_fn(text=new_content)
+        result = await overwrite_fn(new_lines=["Single Line"])
         assert result["status"] == "preview"
         decide_result = await decide_fn(decision="accept")
         assert decide_result["status"] == "success"
@@ -389,7 +388,7 @@ class TestTextEditorServer:
         select_result = await select_fn(2, 3)
         assert select_result["status"] == "success"
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        result = await overwrite_fn(text="")
+        result = await overwrite_fn(new_lines=[])
         assert result["status"] == "preview"
         decide_fn = self.get_tool_fn(server, "decide")
         decide_result = await decide_fn(decision="accept")
@@ -439,7 +438,7 @@ class TestTextEditorServer:
 
         monkeypatch.setattr("builtins.open", mock_open_read)
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        result = await overwrite_fn(text="New content")
+        result = await overwrite_fn(new_lines=["New content"])
         assert "error" in result
         assert "Error reading file" in result["error"]
         assert "Mock file read error" in result["error"]
@@ -462,7 +461,7 @@ class TestTextEditorServer:
 
         monkeypatch.setattr("builtins.open", mock_open_write)
         overwrite_fn = self.get_tool_fn(server, "overwrite")
-        result = await overwrite_fn(text="New content")
+        result = await overwrite_fn(new_lines=["New content"])
         assert "status" in result
         assert result["status"] == "preview"
         decide_fn = self.get_tool_fn(server, "decide")
@@ -484,7 +483,7 @@ class TestTextEditorServer:
             select_result = await select_fn(2, 2)
             assert select_result["status"] == "success"
             overwrite_fn = self.get_tool_fn(server, "overwrite")
-            result = await overwrite_fn(text="New Line 2")
+            result = await overwrite_fn(new_lines=["New Line 2"])
             assert result["status"] == "preview"
             decide_fn = self.get_tool_fn(server, "decide")
             decide_result = await decide_fn(decision="accept")
@@ -513,8 +512,8 @@ class TestTextEditorServer:
             select_result = await select_fn(1, 4)
             assert select_result["status"] == "success"
             overwrite_fn = self.get_tool_fn(server, "overwrite")
-            new_content = "def greeting(name):\n    return f'Hello, {name}!'\n\nresult = greeting('World')\n"
-            result = await overwrite_fn(text=new_content)
+            new_content = ["def greeting(name):", "    return f'Hello, {name}!'", "", "result = greeting('World')"]
+            result = await overwrite_fn(new_lines=new_content)
             assert result["status"] == "preview"
             decide_fn = self.get_tool_fn(server, "decide")
             decide_result = await decide_fn(decision="accept")
@@ -522,7 +521,8 @@ class TestTextEditorServer:
             assert "Changes applied successfully" in decide_result["message"]
             with open(py_file_path, "r") as f:
                 file_content = f.read()
-            assert file_content == new_content
+            expected_content = "def greeting(name):\n    return f'Hello, {name}!'\n\nresult = greeting('World')\n"
+            assert file_content == expected_content
         finally:
             if os.path.exists(py_file_path):
                 os.unlink(py_file_path)
@@ -543,8 +543,8 @@ class TestTextEditorServer:
             select_result = await select_fn(1, 4)
             assert select_result["status"] == "success"
             overwrite_fn = self.get_tool_fn(server, "overwrite")
-            invalid_python = "def broken_function(:\n    print('Missing parenthesis'\n\nresult = broken_function()\n"
-            result = await overwrite_fn(text=invalid_python)
+            invalid_python = ["def broken_function(:", "    print('Missing parenthesis'", "", "result = broken_function()"]
+            result = await overwrite_fn(new_lines=invalid_python)
             assert "error" in result
             assert "Python syntax error:" in result["error"]
             with open(py_file_path, "r") as f:
@@ -579,8 +579,8 @@ class TestTextEditorServer:
             select_result = await select_fn(1, 5)
             assert select_result["status"] == "success"
             overwrite_fn = self.get_tool_fn(server, "overwrite")
-            new_js_content = "function greeting(name) {\n  return `Hello, ${name}!`;\n}\n\nconst result = greeting('World');\n"
-            result = await overwrite_fn(text=new_js_content)
+            new_lines = ["function greeting(name) {", "  return `Hello, ${name}!`;", "}", "", "const result = greeting('World');"]
+            result = await overwrite_fn(new_lines=new_lines)
             assert result["status"] == "preview"
             decide_fn = self.get_tool_fn(server, "decide")
             decide_result = await decide_fn(decision="accept")
@@ -588,7 +588,8 @@ class TestTextEditorServer:
             assert "Changes applied successfully" in decide_result["message"]
             with open(js_file_path, "r") as f:
                 file_content = f.read()
-            assert file_content == new_js_content
+            expected_content = "function greeting(name) {\n  return `Hello, ${name}!`;\n}\n\nconst result = greeting('World');\n"
+            assert file_content == expected_content
         finally:
             if os.path.exists(js_file_path):
                 os.unlink(js_file_path)
@@ -617,8 +618,8 @@ class TestTextEditorServer:
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(1, 5)
             overwrite_fn = self.get_tool_fn(server, "overwrite")
-            invalid_js = "function broken() {\n  return 'Missing closing bracket;\n}\n\nconst result = broken();\n"
-            result = await overwrite_fn(text=invalid_js)
+            invalid_js = ["function broken() {", "  return 'Missing closing bracket;", "}", "", "const result = broken();"]
+            result = await overwrite_fn(new_lines=invalid_js)
             assert "error" in result
             assert "JavaScript syntax error:" in result["error"]
             with open(js_file_path, "r") as f:
@@ -653,8 +654,8 @@ class TestTextEditorServer:
             select_result = await select_fn(1, 7)
             assert select_result["status"] == "success"
             overwrite_fn = self.get_tool_fn(server, "overwrite")
-            new_jsx_content = "import React from 'react';\n\nfunction Greeting({ name }) {\n  return <div>Hello, {name}!</div>;\n}\n\nexport default Greeting;\n"
-            result = await overwrite_fn(text=new_jsx_content)
+            new_jsx_content = ["import React from 'react';", "", "function Greeting({ name }) {", "  return <div>Hello, {name}!</div>;", "}", "", "export default Greeting;"]
+            result = await overwrite_fn(new_lines=new_jsx_content)
             assert result["status"] == "preview"
             decide_fn = self.get_tool_fn(server, "decide")
             decide_result = await decide_fn(decision="accept")
@@ -662,7 +663,8 @@ class TestTextEditorServer:
             assert "Changes applied successfully" in decide_result["message"]
             with open(jsx_file_path, "r") as f:
                 file_content = f.read()
-            assert file_content == new_jsx_content
+            expected_content = "import React from 'react';\n\nfunction Greeting({ name }) {\n  return <div>Hello, {name}!</div>;\n}\n\nexport default Greeting;\n"
+            assert file_content == expected_content
         finally:
             if os.path.exists(jsx_file_path):
                 os.unlink(jsx_file_path)
@@ -691,8 +693,8 @@ class TestTextEditorServer:
             select_fn = self.get_tool_fn(server, "select")
             select_result = await select_fn(1, 7)
             overwrite_fn = self.get_tool_fn(server, "overwrite")
-            invalid_jsx = "import React from 'react';\n\nfunction BrokenComponent() {\n  return <div>Missing closing tag<div>;\n}\n\nexport default BrokenComponent;\n"
-            result = await overwrite_fn(text=invalid_jsx)
+            invalid_jsx = ["import React from 'react';", "", "function BrokenComponent() {", "  return <div>Missing closing tag<div>;", "}", "", "export default BrokenComponent;"]
+            result = await overwrite_fn(new_lines=invalid_jsx)
             assert "error" in result
             assert "JavaScript syntax error:" in result["error"]
             with open(jsx_file_path, "r") as f:

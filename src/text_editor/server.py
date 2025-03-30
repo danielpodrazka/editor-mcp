@@ -36,7 +36,7 @@ def calculate_id(text: str, start: int = None, end: int = None) -> str:
 
 def generate_diff_preview(
     original_lines: list, modified_lines: list, start: int, end: int
-) -> str:
+) -> dict:
     """
     Generate a diff preview comparing original and modified content.
 
@@ -47,21 +47,17 @@ def generate_diff_preview(
         end (int): End line number of the edit (1-based)
 
     Returns:
-        str: A human-readable diff preview in a format similar to git diff
+        dict: A dictionary with keys prefixed with + or - to indicate additions/deletions
+              Format: [("-1", "removed line"), ("+1", "added line")]
     """
-    diff_lines = []
-
-    # Header
-    diff_lines.append(f"@@ Diff preview for lines {start}-{end} @@")
-
+    diffs = []
     # Add some context lines before the change
     context_start = max(0, start - 1 - 3)  # 3 lines of context before
     for i in range(context_start, start - 1):
-        diff_lines.append(f" {i+1:4d}| {original_lines[i].rstrip()}")
-
+        diffs.append((i + 1, original_lines[i].rstrip()))
     # Show removed lines
     for i in range(start - 1, end):
-        diff_lines.append(f"-{i+1:4d}| {original_lines[i].rstrip()}")
+        diffs.append((f"-{i+1}", original_lines[i].rstrip()))
 
     # Show added lines
     new_content = "".join(
@@ -75,28 +71,13 @@ def generate_diff_preview(
     )
     new_lines = new_content.splitlines()
     for i, line in enumerate(new_lines):
-        diff_lines.append(f"+{start+i:4d}| {line}")
-
-    # Add some context lines after the change
+        diffs.append((f"+{start+i}", line))
     context_end = min(len(original_lines), end + 3)  # 3 lines of context after
     for i in range(end, context_end):
-        diff_lines.append(f" {i+1:4d}| {original_lines[i].rstrip()}")
-
-    return "\n".join(diff_lines)
-
-
-def format_line(line_number: int, line_text: str) -> str:
-    """
-    Format a line with its line number for display.
-
-    Args:
-        line_number (int): The line number (1-based)
-        line_text (str): The text content of the line
-
-    Returns:
-        str: Formatted string with line number and text
-    """
-    return f"{line_number:4d}| {line_text.rstrip()}"
+        diffs.append((i + 1, original_lines[i].rstrip()))
+    return {
+        "diff_lines": diffs,
+    }
 
 
 class TextEditorServer:
@@ -180,14 +161,13 @@ class TextEditorServer:
             with open(self.current_file_path, "r", encoding="utf-8") as file:
                 lines = file.readlines()
 
-                # Format lines with line numbers
-                formatted_lines = []
+                # Format lines with line numbers as a dictionary
+                formatted_lines = {}
                 for i, line in enumerate(lines, 1):
-                    formatted_lines.append(format_line(i, line))
+                    formatted_lines[i] = line.rstrip()
 
-                text = "\n".join(formatted_lines)
             return {
-                "text": text,
+                "lines": formatted_lines,
                 "total_lines": len(lines),
                 "max_edit_lines": self.max_edit_lines,
             }
@@ -202,7 +182,7 @@ class TextEditorServer:
                 end (int, optional): End line number (1-based indexing).
 
             Returns:
-                dict: Dictionary containing the text of each line prefixed with its line number
+                dict: Dictionary containing the lines with their line numbers
             """
             result = {}
 
@@ -222,13 +202,11 @@ class TextEditorServer:
 
                 selected_lines = lines[start - 1 : end]
 
-                formatted_lines = []
+                formatted_lines = {}
                 for i, line in enumerate(selected_lines, start):
-                    formatted_lines.append(format_line(i, line))
+                    formatted_lines[i] = line.rstrip()
 
-                formatted_text = "\n".join(formatted_lines)
-
-                result["text"] = formatted_text
+                result["lines"] = formatted_lines
                 result["start_line"] = start
                 result["end_line"] = end
 
@@ -253,7 +231,7 @@ class TextEditorServer:
                 end (int): End line number (1-based)
 
             Returns:
-                dict: Dictionary containing the selected text, line range, and ID for verification
+                dict: Dictionary containing the selected lines, line range, and ID for verification
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -285,9 +263,12 @@ class TextEditorServer:
                 self.selected_end = end
                 self.selected_id = current_id
 
+                # Convert selected lines to a list without line numbers
+                lines_content = [line.rstrip() for line in selected_lines]
+
                 result = {
                     "status": "success",
-                    "text": text,
+                    "lines": lines_content,
                     "start": start,
                     "end": end,
                     "id": current_id,
@@ -302,7 +283,7 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def overwrite(
-            text: str,
+            new_lines: list,
         ) -> Dict[str, Any]:
             """
             Prepare to overwrite a range of lines in the current file with new text.
@@ -312,7 +293,7 @@ class TextEditorServer:
             2. Then call decide() to accept or cancel the pending changes
 
             Args:
-                text (str): New text to overwrite the selected range
+                new_lines (list): List of new lines to overwrite the selected range
 
             Returns:
                 dict: Diff preview showing the proposed changes
@@ -353,15 +334,23 @@ class TextEditorServer:
                     "error": "id verification failed. The content may have been modified since you last read it."
                 }
 
-            new_text = text
-            if new_text != "" and not new_text.endswith("\n") and end < len(lines):
-                new_text += "\n"
+            processed_new_lines = []
+            for line in new_lines:
+                if not line.endswith("\n"):
+                    processed_new_lines.append(line + "\n")
+                else:
+                    processed_new_lines.append(line)
 
-            new_lines = new_text.splitlines(True)
+            if (
+                processed_new_lines
+                and end < len(lines)
+                and not processed_new_lines[-1].endswith("\n")
+            ):
+                processed_new_lines[-1] += "\n"
 
             before = lines[: start - 1]
             after = lines[end:]
-            modified_lines = before + new_lines + after
+            modified_lines = before + processed_new_lines + after
 
             if self.current_file_path.endswith(".py"):
                 full_content = "".join(modified_lines)
@@ -430,17 +419,15 @@ class TextEditorServer:
                     if os.path.exists(temp_path):
                         os.unlink(temp_path)
 
-            # Generate diff preview
-            diff_preview = generate_diff_preview(lines, modified_lines, start, end)
+            diff_result = generate_diff_preview(lines, modified_lines, start, end)
 
-            # Store pending changes for later application
             self.pending_modified_lines = modified_lines
-            self.pending_diff = diff_preview
+            self.pending_diff = diff_result
 
             result = {
                 "status": "preview",
                 "message": "Changes ready to apply. Use decide('accept') to apply or decide('cancel') to discard.",
-                "diff_preview": diff_preview,
+                "diff_lines": diff_result["diff_lines"],
                 "start": start,
                 "end": end,
             }
@@ -614,9 +601,9 @@ class TextEditorServer:
 
 def main():
     """Entry point for the application.
-    
-    This function is used both for direct execution and 
-    when the package is installed via UVX, allowing the 
+
+    This function is used both for direct execution and
+    when the package is installed via UVX, allowing the
     application to be run using the `editor-mcp` command.
     """
     server = TextEditorServer()
