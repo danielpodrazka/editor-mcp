@@ -65,12 +65,12 @@ pip install -e .
 
 Install from the lock file:
 ```bash
-uv pip install -r requirements.lock
+uv pip install -r uv.lock
 ```
 
 ### Generating a locked requirements file:
 ```bash
-uv pip compile requirements.in -o requirements.lock
+uv pip compile requirements.in -o uv.lock
 ```
 
 ## Usage
