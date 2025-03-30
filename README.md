@@ -5,16 +5,33 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 ## Features
 
 - **File Selection**: Set a file to work with using absolute paths
-- **Read Operations**: 
+- **Read Operations**:
   - Read entire files with line numbers using `skim`
-  - Read specific line ranges with prefixed line numbers
-- **Edit Operations**: 
+  - Read specific line ranges with prefixed line numbers using `read`
+  - Find specific text within files using `find_line`
+- **Edit Operations**:
   - Two-step editing process with diff preview
   - Select and overwrite text with ID verification
+  - Clean editing workflow with select → overwrite → decide pattern
   - Syntax checking for Python (.py) and JavaScript/React (.js, .jsx) files
   - Create new files with content
-- **File Deletion**: Remove files from the filesystem
-- **Search Operations**: Find lines containing specific text with line numbers and IDs
+- **File Management**:
+  - Create new files with proper initialization
+  - Delete files from the filesystem
+- **Safety Features**:
+  - Content ID verification to prevent conflicts
+  - Line count limits to prevent resource exhaustion
+  - Syntax checking to maintain code integrity
+
+## Resource Management
+
+The editor implements several safeguards to ensure system stability and prevent resource exhaustion:
+
+- **Maximum Edit Lines**: By default, the editor enforces a 50-line limit for any single edit operation
+- **Two-Step Editing Process**: Changes are previewed before being applied to prevent unintended modifications
+- **Syntax Validation**: Code changes undergo syntax checking before being committed, preventing corruption
+- **ID Verification**: Each edit operation verifies the content hasn't changed since it was last read
+
 ## Installation
 
 ### Easy Installation with UVX (Recommended)
@@ -395,6 +412,19 @@ The main `TextEditorServer` class:
    - `find_line`: Finds lines containing specific text
 
 The server runs using FastMCP's stdio transport by default, making it easy to integrate with various clients.
+
+## System Prompt for Best Results
+
+For optimal results with AI assistants, it's recommended to use the system prompt (see system_prompt.md) that helps guide the AI in making manageable, safe edits.
+
+This system prompt helps the AI assistant:
+
+1. **Make incremental changes** - Breaking down edits into smaller parts
+2. **Maintain code integrity** - Making changes that keep the code functional
+3. **Work within resource limits** - Avoiding operations that could overwhelm the system
+4. **Follow a verification workflow** - Doing final checks for errors after edits
+
+By incorporating this system prompt when working with AI assistants, you'll get more reliable editing behavior and avoid common pitfalls in automated code editing.
 
 ## Troubleshooting
 
