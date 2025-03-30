@@ -415,7 +415,7 @@ The server runs using FastMCP's stdio transport by default, making it easy to in
 
 ## System Prompt for Best Results
 
-For optimal results with AI assistants, it's recommended to use the system prompt (see system_prompt.md) that helps guide the AI in making manageable, safe edits.
+For optimal results with AI assistants, it's recommended to use the system prompt (see [system_prompt.md](system_prompt.md)) that helps guide the AI in making manageable, safe edits.
 
 This system prompt helps the AI assistant:
 
@@ -425,6 +425,10 @@ This system prompt helps the AI assistant:
 4. **Follow a verification workflow** - Doing final checks for errors after edits
 
 By incorporating this system prompt when working with AI assistants, you'll get more reliable editing behavior and avoid common pitfalls in automated code editing.
+
+## Known Issues
+
+Sometimes when `overwrite` tool is used, the Claude Desktop stops working and a message about temporary disruption is displayed. I reported this to Claude. If you come across this error, you can restart Claude Desktop and try again. Try making a small change first, if it works, it's more likely the tool will continue working in the active chat.
 
 ## Troubleshooting
 
