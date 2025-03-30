@@ -5,13 +5,16 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 ## Features
 
 - **File Selection**: Set a file to work with using absolute paths
-- **Read Operations**: Read entire files or specific line ranges
+- **Read Operations**: 
+  - Read entire files with line numbers using `skim`
+  - Read specific line ranges with prefixed line numbers
 - **Edit Operations**: 
   - Two-step editing process with diff preview
-  - Select and overwrite text in a specified line range
+  - Select and overwrite text with ID verification
+  - Syntax checking for Python (.py) and JavaScript/React (.js, .jsx) files
   - Create new files with content
 - **File Deletion**: Remove files from the filesystem
-- **Search Operations**: Find lines containing specific text
+- **Search Operations**: Find lines containing specific text with line numbers and IDs
 ## Installation
 
 Install from the lock file:
@@ -44,29 +47,37 @@ Sets the current file to work with.
 - Confirmation message with the file path
 
 #### 2. `skim`
-Reads full text from the current file.
+Reads full text from the current file. Each line is prefixed with its line number.
 
 **Returns**:
-- Dictionary containing the complete text of the file
+- Dictionary containing the complete text of the file with line numbers prefixed, total number of lines, and the max edit lines setting
 
 **Example output**:
 ```
-{"text": "def hello():\n    print(\"Hello, world!\")\n\nhello()"}
+{
+  "text": "   1| def hello():\n   2|     print(\"Hello, world!\")\n   3| \n   4| hello()",
+  "total_lines": 4,
+  "max_edit_lines": 50
+}
 ```
 
 #### 3. `read`
-Reads text from the current file and gets its ID for editing operations.
+Reads text from the current file from start line to end line.
 
 **Parameters**:
 - `start` (int): Start line number (1-based indexing)
 - `end` (int): End line number (1-based indexing)
 
 **Returns**:
-- Dictionary containing the text and lines range id if file has <= MAX_EDIT_LINES lines
+- Dictionary containing the text of each line prefixed with its line number
 
 **Example output**:
 ```
-{"text": "def hello():\n    print(\"Hello, world!\")\n\nhello()", "id": "L1-4-a1b2c3"}
+{
+  "text": "   1| def hello():\n   2|     print(\"Hello, world!\")\n   3| \n   4| hello()",
+  "start_line": 1,
+  "end_line": 4
+}
 ```
 
 #### 4. `select`
