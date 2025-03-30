@@ -1,4 +1,4 @@
-# MCP Text Editor
+# Editor MCP
 
 A Python-based text editor server built with FastMCP that provides tools for file operations. This server enables reading, editing, and managing text files through a standardized API.
 
@@ -19,7 +19,7 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 
 ### Easy Installation with UVX (Recommended)
 
-The easiest way to install the MCP Text Editor is using the provided installation script:
+The easiest way to install the Editor MCP is using the provided installation script:
 
 ```bash
 # Clone the repository
@@ -33,7 +33,7 @@ chmod +x install.sh
 
 This script will:
 1. Check if UVX is installed and install it if necessary
-2. Install the MCP Text Editor in development mode
+2. Install the Editor MCP in development mode
 3. Make the `editor-mcp` command available in your PATH
 
 ### Manual Installation
@@ -77,7 +77,7 @@ uv pip compile requirements.in -o uv.lock
 
 ### Starting the Server
 
-After installation, you can start the MCP Text Editor server using one of these methods:
+After installation, you can start the Editor MCP server using one of these methods:
 
 ```bash
 # Using the installed script
@@ -89,7 +89,7 @@ python -m text_editor.server
 
 ### MCP Configuration
 
-You can add the MCP Text Editor to your MCP configuration file:
+You can add the Editor MCP to your MCP configuration file:
 
 ```json
 {
