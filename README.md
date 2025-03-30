@@ -1,6 +1,6 @@
 # Editor MCP
 
-A Python-based text editor server built with FastMCP that provides tools for file operations. This server enables reading, editing, and managing text files through a standardized API.
+A Python-based text editor server built with FastMCP that provides tools for file operations. This server enables reading, editing, and managing text files through a standardized API with a unique multi-step approach that significantly improves code editing accuracy and reliability for LLMs.
 
 ## Features
 
@@ -22,6 +22,20 @@ A Python-based text editor server built with FastMCP that provides tools for fil
   - Content ID verification to prevent conflicts
   - Line count limits to prevent resource exhaustion
   - Syntax checking to maintain code integrity
+
+## Key Advantages For LLMs
+
+This text editor's unique design solves critical problems that typically affect LLM code editing:
+
+- **Prevents Loss of Context** - Traditional approaches often lead to LLMs losing overview of the codebase after a few edits. This implementation maintains context through the multi-step process.
+
+- **Avoids Resource-Intensive Rewrites** - LLMs typically default to replacing entire files when confused, which is costly, slow, and inefficient. This editor enforces selective edits.
+
+- **Provides Visual Feedback** - The diff preview system allows the LLM to actually see and verify changes before committing them, dramatically reducing errors.
+
+- **Enforces Syntax Checking** - Automatic validation for Python and JavaScript/React ensures that broken code isn't committed.
+
+- **Improves Edit Reasoning** - The multi-step approach gives the LLM time to reason between steps, reducing haphazard token production.
 
 ## Resource Management
 
@@ -389,6 +403,21 @@ The test suite covers:
 
 ## How it Works
 
+### The Multi-Step Editing Approach
+
+Unlike traditional code editing approaches where LLMs simply search for lines to edit and make replacements (often leading to confusion after multiple edits), this editor implements a structured multi-step workflow that dramatically improves editing accuracy:
+
+1. **set_file** - First, the LLM sets which file it wants to edit
+2. **skim** - The LLM reads the entire file to gain a complete overview
+3. **read** - The LLM examines specific sections relevant to the task, with lines shown alongside numbers for better context
+4. **select** - When ready to edit, the LLM selects specific lines (limited to a configurable number, default 50)
+5. **overwrite** - The LLM proposes replacement content, resulting in a git diff-style preview that shows exactly what will change
+6. **decide** - After reviewing the preview, the LLM can accept or cancel the changes
+
+This structured workflow forces the LLM to reason carefully about each edit and prevents common errors like accidentally overwriting entire files. By seeing previews of changes before committing them, the LLM can verify its edits are correct.
+
+### ID Verification System
+
 The server uses FastMCP to expose text editing capabilities through a well-defined API. The ID verification system ensures data integrity by verifying that the content hasn't changed between reading and modifying operations.
 
 The ID mechanism uses SHA-256 to generate a unique identifier of the file content or selected line ranges. For line-specific operations, the ID includes a prefix indicating the line range (e.g., "L10-15-[hash]"). This helps ensure that edits are being applied to the expected content.
@@ -435,6 +464,15 @@ Claude will return soon
 Claude.ai is currently experiencing a temporary service disruption. We’re working on it, please check back soon.
 ```
 
+Here is a temporary way to walk around this issue:
+Create a new chat with the following prompt:
+```
+Create a new file in `./hello_world.txt` and replace the content with text: "hello world"
+```
+This will create a file called hello_world.txt in your home directory.
+
+After this, you should be able to use the chat with this tool normally.
+![example.png](example.png)
 ## Troubleshooting
 
 If you encounter issues:
