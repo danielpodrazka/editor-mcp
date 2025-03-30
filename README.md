@@ -105,7 +105,9 @@ You can add the MCP Text Editor to your MCP configuration file:
 }
 ```
 Explanation of env variables:
+
 "MAX_EDIT_LINES": "100" - The LLM won't be able to overwrite more than 100 lines at a time (default is 50)
+
 "ENABLE_JS_SYNTAX_CHECK": "0" - When editing Javascript/React code, the changes won't be checked for syntax issues
 
 ### Sample MCP config entry when building from source
