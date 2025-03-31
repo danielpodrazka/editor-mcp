@@ -84,31 +84,36 @@ class TextEditorServer:
     """
     A server implementation for a text editor application using FastMCP.
 
-    This class provides a set of tools for interacting with text files, including:
-    - Setting the current file to work with
-    - Reading file content as structured line dictionaries
-    - Editing file content through a two-step process of selecting lines and overwriting with new content
-    - Creating new files
-    - Deleting files
+    This class provides a comprehensive set of tools for manipulating text files in a
+    controlled and safe manner. It implements a structured editing workflow with content
+    verification to prevent conflicts during editing operations.
 
-    The server uses IDs to ensure file content integrity during editing operations.
-    It registers all tools with FastMCP for remote procedure calling.
+    Primary features:
+    - File management: Setting active file, creating new files, and deleting files
+    - Content access: Reading full file content or specific line ranges
+    - Text search: Finding lines matching specific text patterns
+    - Safe editing: Two-step edit process with diff preview and confirmation
+    - Syntax validation: Automatic syntax checking for Python and JavaScript files
 
-    The editor implements a two-step edit process:
-    1. First, the overwrite tool creates a diff preview of the changes
-    2. Then, the decide tool allows accepting or canceling the pending changes
+    The server uses content hashing to generate unique IDs that ensure file content
+    integrity during editing operations. All tools are registered with FastMCP for
+    remote procedure calling.
+
+    Edit workflow:
+    1. Select content range with the select() tool to identify lines for editing
+    2. Propose changes with overwrite() to generate a diff preview
+    3. Confirm changes with decide() to apply or cancel the pending modifications
 
     Attributes:
         mcp (FastMCP): The MCP server instance for handling tool registrations
-        max_edit_lines (int): Maximum number of lines that can be edited with id verification
+        max_edit_lines (int): Maximum number of lines that can be edited with ID verification
         enable_js_syntax_check (bool): Whether JavaScript syntax checking is enabled
         current_file_path (str, optional): Path to the currently active file
         selected_start (int, optional): Start line of the current selection
         selected_end (int, optional): End line of the current selection
         selected_id (str, optional): ID of the current selection for verification
         pending_modified_lines (list, optional): Pending modified lines for preview before committing
-        pending_diff (str, optional): Diff preview of pending changes
-        selected_id (str, optional): ID of the current selection for verification
+        pending_diff (dict, optional): Diff preview of pending changes
     """
 
     def __init__(self):
@@ -300,7 +305,7 @@ class TextEditorServer:
 
         @self.mcp.tool()
         async def overwrite(
-            new_lines: list,
+            new_lines: dict,
         ) -> Dict[str, Any]:
             """
             Prepare to overwrite a range of lines in the current file with new text.
@@ -310,7 +315,8 @@ class TextEditorServer:
             2. Then call decide() to accept or cancel the pending changes
 
             Args:
-                new_lines (list): List of new lines to overwrite the selected range
+                new_lines (dict): List of new lines to overwrite the selected range. Wrapped in "lines" key. Example:
+                {"lines":["line one", "second line"]}
 
             Returns:
                 dict: Diff preview showing the proposed changes
@@ -322,6 +328,7 @@ class TextEditorServer:
                 - For JavaScript/React files (.js, .jsx extensions), syntax checking is optional
                   and controlled by the ENABLE_JS_SYNTAX_CHECK environment variable
             """
+            new_lines = new_lines.get("lines")
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
 
