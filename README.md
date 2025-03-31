@@ -48,6 +48,11 @@ The editor implements several safeguards to ensure system stability and prevent 
 
 ## Installation
 
+This MCP was developed and tested with Claude Desktop. You can download Claude Desktop on any platform.
+For Claude Desktop on Linux,you can use an unofficial installation script (uses official file though), I recommend this repository:
+https://github.com/emsi/claude-desktop/tree/main
+Once you have Claude Desktop you need to follow instruction below to install this specific MCP.
+
 ### Easy Installation with UVX (Recommended)
 
 The easiest way to install the Editor MCP is using the provided installation script:
