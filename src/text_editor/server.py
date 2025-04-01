@@ -387,10 +387,16 @@ class TextEditorServer:
                         mode=black.Mode(),
                     )
                 except black.InvalidInput as e:
-                    return {"error": f"Python syntax error: {str(e)}"}
+                    error = {
+                        "error": f"Python syntax error: {str(e)}",
+                        "diff_lines": diff_result,
+                    }
                 except Exception as e:
                     if not isinstance(e, NothingChanged):
-                        return {"error": f"Black check raised {type(e)}: {str(e)}"}
+                        error = {
+                            "error": f"Black check raised {type(e)}: {str(e)}",
+                            "diff_lines": diff_result,
+                        }
 
             elif self.enable_js_syntax_check and self.current_file_path.endswith(
                 (".jsx", ".js")
