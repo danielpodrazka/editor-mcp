@@ -33,6 +33,14 @@ class TestTextEditorServer:
         if os.path.exists(temp_path):
             os.unlink(temp_path)
 
+    @pytest.fixture
+    def server_with_protected_paths(self):
+        """Create a TextEditorServer instance with protected paths configuration."""
+        server = TextEditorServer()
+        server.max_edit_lines = 200
+        # Define protected paths for testing
+        server.protected_paths = ["*.env", "/etc/passwd", "/home/secret-file.txt"]
+        return server
     def get_tool_fn(self, server, tool_name):
         """Helper to get the tool function from the server."""
         tools_dict = server.mcp._tool_manager._tools
@@ -46,6 +54,102 @@ class TestTextEditorServer:
         assert "File set to:" in result
         assert temp_file in result
         assert server.current_file_path == temp_file
+
+    @pytest.mark.asyncio
+    async def test_set_file_protected_path_exact_match(self, server_with_protected_paths):
+        """Test setting a file path that exactly matches a protected path."""
+        set_file_fn = self.get_tool_fn(server_with_protected_paths, "set_file")
+        result = await set_file_fn("/etc/passwd")
+        assert "Error: Access to '/etc/passwd' is denied" in result
+        assert server_with_protected_paths.current_file_path is None
+
+    @pytest.mark.asyncio
+    async def test_set_file_protected_path_wildcard_match(self, server_with_protected_paths, monkeypatch):
+        """Test setting a file path that matches a wildcard protected path pattern."""
+        # Create a temporary .env file for testing
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".env", delete=False) as f:
+            f.write("API_KEY=test_key\n")
+            env_file_path = f.name
+
+        # Mock os.path.isfile to return True for our temp file
+        def mock_isfile(path):
+            return path == env_file_path
+
+        monkeypatch.setattr(os.path, "isfile", mock_isfile)
+
+        try:
+            set_file_fn = self.get_tool_fn(server_with_protected_paths, "set_file")
+            result = await set_file_fn(env_file_path)
+            assert "Error: Access to '" in result
+            assert "is denied due to PROTECTED_PATHS configuration (matches pattern '*.env')" in result
+            assert server_with_protected_paths.current_file_path is None
+        finally:
+            if os.path.exists(env_file_path):
+                os.unlink(env_file_path)
+
+    @pytest.mark.asyncio
+    async def test_set_file_protected_path_glob_match(self, monkeypatch):
+        """Test setting a file path that matches a more complex glob pattern."""
+        # Create a server with different glob patterns
+        server = TextEditorServer()
+        server.protected_paths = [".env*", "config*.json", "*keys.txt"]
+
+        # Create a temporary .env.local file for testing
+        with tempfile.NamedTemporaryFile(mode="w+", prefix=".env", suffix=".local", delete=False) as f:
+            f.write("API_KEY=test_key\n")
+            env_local_path = f.name
+
+        # Create a temporary config-dev.json file for testing
+        with tempfile.NamedTemporaryFile(mode="w+", prefix="config-", suffix=".json", delete=False) as f:
+            f.write("{\"debug\": true}\n")
+            config_path = f.name
+
+        # Create a custom filename that will definitely match our pattern
+        keys_file_path = os.path.join(tempfile.gettempdir(), "api-keys.txt")
+        with open(keys_file_path, "w") as f:
+            f.write("secret_key=abc123\n")
+        secret_path = keys_file_path
+
+        # Mock os.path.isfile to return True for our test files
+        def mock_isfile(path):
+            return path in [env_local_path, config_path, secret_path]
+
+        monkeypatch.setattr(os.path, "isfile", mock_isfile)
+
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            
+            # Test .env* pattern
+            result = await set_file_fn(env_local_path)
+            assert "Error: Access to '" in result
+            assert "is denied due to PROTECTED_PATHS configuration (matches pattern '.env*'" in result
+            assert server.current_file_path is None
+            
+            # Test config*.json pattern
+            result = await set_file_fn(config_path)
+            assert "Error: Access to '" in result
+            assert "is denied due to PROTECTED_PATHS configuration (matches pattern 'config*.json'" in result
+            assert server.current_file_path is None
+            
+            # Test *keys.txt pattern
+            result = await set_file_fn(secret_path)
+            assert "Error: Access to '" in result
+            assert "is denied due to PROTECTED_PATHS configuration (matches pattern '*keys.txt'" in result
+            assert server.current_file_path is None
+        finally:
+            # Clean up temp files
+            for path in [env_local_path, config_path, secret_path]:
+                if os.path.exists(path):
+                    os.unlink(path)
+
+    @pytest.mark.asyncio
+    async def test_set_file_non_protected_path(self, server_with_protected_paths, temp_file):
+        """Test setting a file path that does not match any protected paths."""
+        set_file_fn = self.get_tool_fn(server_with_protected_paths, "set_file")
+        result = await set_file_fn(temp_file)
+        assert "File set to:" in result
+        assert temp_file in result
+        assert server_with_protected_paths.current_file_path == temp_file
 
     @pytest.mark.asyncio
     async def test_set_file_invalid(self, server):
@@ -945,6 +1049,57 @@ def outer_function(param):
         result = await find_function_fn(function_name="nonexistent_function")
         assert "error" in result
         assert "not found in the file" in result["error"]
+    @pytest.mark.asyncio
+    async def test_protect_paths_env_variable(self, monkeypatch):
+        """Test that the PROTECTED_PATHS environment variable is correctly processed."""
+        # Set up the environment variable with test paths
+        monkeypatch.setenv("PROTECTED_PATHS", "*.secret,.env*,config*.json,*sensitive*,/etc/shadow,/home/user/.ssh/id_rsa")
+
+        # Create a new server instance which should read the environment variable
+        server = TextEditorServer()
+
+        # Verify the protected_paths list is populated correctly
+        assert len(server.protected_paths) == 6
+        assert "*.secret" in server.protected_paths
+        assert ".env*" in server.protected_paths
+        assert "config*.json" in server.protected_paths
+        assert "*sensitive*" in server.protected_paths
+        assert "/etc/shadow" in server.protected_paths
+        assert "/home/user/.ssh/id_rsa" in server.protected_paths
+
+    @pytest.mark.asyncio
+    async def test_protect_paths_empty_env_variable(self, monkeypatch):
+        """Test that an empty PROTECTED_PATHS environment variable is handled correctly."""
+        # Set up an empty environment variable
+        monkeypatch.setenv("PROTECTED_PATHS", "")
+
+        # Create a new server instance
+        server = TextEditorServer()
+
+        # Verify the protected_paths list is empty
+        assert len(server.protected_paths) == 0
+
+    @pytest.mark.asyncio
+    async def test_protect_paths_trimming(self, monkeypatch):
+        """Test that whitespace in PROTECTED_PATHS items is properly trimmed."""
+        # Set up the environment variable with whitespace
+        monkeypatch.setenv("PROTECTED_PATHS", " *.secret , /etc/shadow ,  /home/user/.ssh/id_rsa ")
+
+        # Create a new server instance
+        server = TextEditorServer()
+
+        # Get set_file tool for testing
+        set_file_fn = self.get_tool_fn(server, "set_file")
+
+        # Mock os.path.isfile to return True for our test path
+        def mock_isfile(path):
+            return True
+
+        monkeypatch.setattr(os.path, "isfile", mock_isfile)
+
+        # Test access denied for a path matching a trimmed pattern
+        result = await set_file_fn("/home/user/.ssh/id_rsa")
+        assert "Error: Access to '/home/user/.ssh/id_rsa' is denied" in result
 
     @pytest.mark.asyncio
     async def test_find_function_nested(self, server, python_test_file):

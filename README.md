@@ -22,6 +22,7 @@ A Python-based text editor server built with FastMCP that provides tools for fil
   - Content ID verification to prevent conflicts
   - Line count limits to prevent resource exhaustion
   - Syntax checking to maintain code integrity
+  - Protected paths to restrict access to sensitive files
 
 ## Key Advantages For LLMs
 
@@ -136,7 +137,8 @@ You can add the Editor MCP to your MCP configuration file:
          "MAX_EDIT_LINES": "100",
          "ENABLE_JS_SYNTAX_CHECK": "0",
          "FAIL_ON_PYTHON_SYNTAX_ERROR": "1",
-         "FAIL_ON_JS_SYNTAX_ERROR": "0"
+         "FAIL_ON_JS_SYNTAX_ERROR": "0",
+         "PROTECTED_PATHS": "*.env,.env*,config*.json,*secret*,/etc/passwd,/home/user/.ssh/id_rsa"
        }
      }
   }
@@ -164,7 +166,8 @@ Explanation of env variables:
           "MAX_EDIT_LINES": "100",
           "ENABLE_JS_SYNTAX_CHECK": "0",
           "FAIL_ON_PYTHON_SYNTAX_ERROR": "1",
-          "FAIL_ON_JS_SYNTAX_ERROR": "0"
+          "FAIL_ON_JS_SYNTAX_ERROR": "0",
+          "PROTECTED_PATHS": "*.env,.env*,config*.json,*secret*,/etc/passwd,/home/user/.ssh/id_rsa"
         }
      }
   }
@@ -330,6 +333,14 @@ Environment variables:
   - The lines will remain selected so you can fix the error and try again
 - `FAIL_ON_JS_SYNTAX_ERROR`: Controls whether JavaScript/JSX syntax errors automatically cancel the overwrite operation (default: 0)
   - When enabled, syntax errors in JavaScript/JSX files will cause the overwrite action to be automatically cancelled
+  - The lines will remain selected so you can fix the error and try again
+- `PROTECTED_PATHS`: Comma-separated list of file patterns or absolute paths that will be denied access
+  - Example: `*.env,.env*,config*.json,*secret*,/etc/passwd,/home/user/credentials.txt`
+  - Supports both exact file paths and flexible glob patterns with wildcards in any position:
+    - `*.env` - matches files ending with .env, like `.env`, `dev.env`, `prod.env`
+    - `.env*` - matches files starting with .env, like `.env`, `.env.local`, `.env.production`
+    - `*secret*` - matches any file containing 'secret' in the name
+  - Provides protection against accidentally exposing sensitive configuration files and credentials
   - The lines will remain selected so you can fix the error and try again
 
 ## Development

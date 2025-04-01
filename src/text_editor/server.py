@@ -1,9 +1,11 @@
 import hashlib
 import os
+import re
 import subprocess
 import tempfile
 import ast
 import tokenize
+import fnmatch
 import io
 from typing import Optional, Dict, Any, Union, Literal
 import black
@@ -97,6 +99,7 @@ class TextEditorServer:
     - Text search: Finding lines matching specific text patterns
     - Safe editing: Two-step edit process with diff preview and confirmation
     - Syntax validation: Automatic syntax checking for Python and JavaScript files
+    - Protected files: Prevent access to sensitive files via pattern matching
 
     The server uses content hashing to generate unique IDs that ensure file content
     integrity during editing operations. All tools are registered with FastMCP for
@@ -111,6 +114,7 @@ class TextEditorServer:
         mcp (FastMCP): The MCP server instance for handling tool registrations
         max_edit_lines (int): Maximum number of lines that can be edited with ID verification
         enable_js_syntax_check (bool): Whether JavaScript syntax checking is enabled
+        protected_paths (list): List of file patterns and paths that are restricted from access
         current_file_path (str, optional): Path to the currently active file
         selected_start (int, optional): Start line of the current selection
         selected_end (int, optional): End line of the current selection
@@ -131,6 +135,7 @@ class TextEditorServer:
         self.fail_on_js_syntax_error = os.getenv(
             "FAIL_ON_JS_SYNTAX_ERROR", "0"
         ).lower() in ["1", "true", "yes"]
+        self.protected_paths = os.getenv("PROTECTED_PATHS", "").split(",") if os.getenv("PROTECTED_PATHS") else []
         self.current_file_path = None
         self.selected_start = None
         self.selected_end = None
@@ -161,6 +166,25 @@ class TextEditorServer:
 
             if not os.path.isfile(absolute_file_path):
                 return f"Error: File not found at '{absolute_file_path}'"
+
+            # Check if the file path matches any of the protected paths
+            for pattern in self.protected_paths:
+                pattern = pattern.strip()
+                if not pattern:
+                    continue
+                # Check for absolute path match
+                if absolute_file_path == pattern:
+                    return f"Error: Access to '{absolute_file_path}' is denied due to PROTECTED_PATHS configuration"
+                # Check for glob pattern match (e.g., *.env, .env*, etc.)
+                if '*' in pattern:
+                    # First try matching the full path
+                    if fnmatch.fnmatch(absolute_file_path, pattern):
+                        return f"Error: Access to '{absolute_file_path}' is denied due to PROTECTED_PATHS configuration (matches pattern '{pattern}')"
+                    
+                    # Then try matching just the basename
+                    basename = os.path.basename(absolute_file_path)
+                    if fnmatch.fnmatch(basename, pattern):
+                        return f"Error: Access to '{absolute_file_path}' is denied due to PROTECTED_PATHS configuration (matches pattern '{pattern}')"
 
             self.current_file_path = absolute_file_path
             return f"File set to: '{absolute_file_path}'"
