@@ -462,7 +462,7 @@ class TextEditorServer:
                 "end": end,
             }
             if error:
-                result["error"] = error
+                result.update(error)
                 result["message"] = (
                     " It looks like there is a syntax error, but you can choose to fix it in the subsequent edits."
                 )

@@ -108,7 +108,8 @@ class TestTextEditorServer:
         read_fn = self.get_tool_fn(server, "read")
         result = await read_fn(4, 2)
         assert "error" in result
-        assert "start cannot be greater than end" in result["error"]
+        # Updated assertion to match actual error message format in server.py
+        assert "start=4 cannot be greater than end=2" in result["error"]
         result = await read_fn(0, 3)
         assert "error" in result
         assert "start must be at least 1" in result["error"]
