@@ -396,7 +396,7 @@ class TextEditorServer:
                     error = {
                         "error": f"Python syntax error: {str(e)}",
                         "diff_lines": diff_result,
-                        "auto_cancel": self.fail_on_python_syntax_error
+                        "auto_cancel": self.fail_on_python_syntax_error,
                     }
                 except Exception as e:
                     if not isinstance(e, NothingChanged):
@@ -451,7 +451,7 @@ class TextEditorServer:
                         error = {
                             "error": f"JavaScript syntax error: {filtered_error}",
                             "diff_lines": diff_result,
-                            "auto_cancel": self.fail_on_js_syntax_error
+                            "auto_cancel": self.fail_on_js_syntax_error,
                         }
 
                 except Exception as e:
@@ -487,7 +487,7 @@ class TextEditorServer:
                 else:
                     result["message"] = (
                         "It looks like there is a syntax error, but you can choose to fix it in the subsequent edits."
-                )
+                    )
 
             return result
 
