@@ -688,10 +688,11 @@ class TextEditorServer:
                 # Find the function in the AST
                 function_node = None
                 class_node = None
+                parent_function = None
 
                 # Helper function to find a function or method node
                 def find_node(node):
-                    nonlocal function_node, class_node
+                    nonlocal function_node, class_node, parent_function
                     if isinstance(node, ast.FunctionDef) and node.name == function_name:
                         function_node = node
                         return True
@@ -701,6 +702,15 @@ class TextEditorServer:
                             if isinstance(item, ast.FunctionDef) and item.name == function_name:
                                 function_node = item
                                 class_node = node
+                                return True
+                    # Check for nested functions
+                    elif isinstance(node, ast.FunctionDef):
+                        for item in node.body:
+                            # Find directly nested function definitions
+                            if isinstance(item, ast.FunctionDef) and item.name == function_name:
+                                function_node = item
+                                # Store parent function information
+                                parent_function = node
                                 return True
                     # Recursively search for nested functions/methods
                     for child in ast.iter_child_nodes(node):
@@ -809,6 +819,11 @@ class TextEditorServer:
                     "start_line": start_line,
                     "end_line": end_line
                 }
+                
+                # Add parent function information if this is a nested function
+                if parent_function:
+                    result["is_nested"] = True
+                    result["parent_function"] = parent_function.name
 
                 return result
 
