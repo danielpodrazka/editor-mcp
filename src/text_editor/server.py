@@ -122,6 +122,12 @@ class TextEditorServer:
         self.enable_js_syntax_check = os.getenv(
             "ENABLE_JS_SYNTAX_CHECK", "1"
         ).lower() in ["1", "true", "yes"]
+        self.fail_on_python_syntax_error = os.getenv(
+            "FAIL_ON_PYTHON_SYNTAX_ERROR", "1"
+        ).lower() in ["1", "true", "yes"]
+        self.fail_on_js_syntax_error = os.getenv(
+            "FAIL_ON_JS_SYNTAX_ERROR", "0"
+        ).lower() in ["1", "true", "yes"]
         self.current_file_path = None
         self.selected_start = None
         self.selected_end = None
@@ -390,6 +396,7 @@ class TextEditorServer:
                     error = {
                         "error": f"Python syntax error: {str(e)}",
                         "diff_lines": diff_result,
+                        "auto_cancel": self.fail_on_python_syntax_error
                     }
                 except Exception as e:
                     if not isinstance(e, NothingChanged):
@@ -444,6 +451,7 @@ class TextEditorServer:
                         error = {
                             "error": f"JavaScript syntax error: {filtered_error}",
                             "diff_lines": diff_result,
+                            "auto_cancel": self.fail_on_js_syntax_error
                         }
 
                 except Exception as e:
@@ -469,8 +477,16 @@ class TextEditorServer:
             }
             if error:
                 result.update(error)
-                result["message"] = (
-                    " It looks like there is a syntax error, but you can choose to fix it in the subsequent edits."
+                if error.get("auto_cancel", False):
+                    self.pending_modified_lines = None
+                    self.pending_diff = None
+                    result["status"] = "auto_cancelled"
+                    result["message"] = (
+                        "Changes automatically cancelled due to syntax error. The lines are still selected."
+                    )
+                else:
+                    result["message"] = (
+                        "It looks like there is a syntax error, but you can choose to fix it in the subsequent edits."
                 )
 
             return result

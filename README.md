@@ -134,7 +134,9 @@ You can add the Editor MCP to your MCP configuration file:
        "command": "editor-mcp",
        "env": {
          "MAX_EDIT_LINES": "100",
-         "ENABLE_JS_SYNTAX_CHECK": "0"
+         "ENABLE_JS_SYNTAX_CHECK": "0",
+         "FAIL_ON_PYTHON_SYNTAX_ERROR": "1",
+         "FAIL_ON_JS_SYNTAX_ERROR": "0"
        }
      }
   }
@@ -146,6 +148,10 @@ Explanation of env variables:
 
 "ENABLE_JS_SYNTAX_CHECK": "0" - When editing Javascript/React code, the changes won't be checked for syntax issues
 
+"FAIL_ON_PYTHON_SYNTAX_ERROR": "1" - When editing Python code, syntax errors will automatically cancel the overwrite action (default is enabled)
+
+"FAIL_ON_JS_SYNTAX_ERROR": "0" - When editing Javascript/React code, syntax errors will NOT automatically cancel the overwrite action (default is disabled)
+
 ### Sample MCP config entry when building from source
 
 ```json
@@ -156,7 +162,9 @@ Explanation of env variables:
        "args": ["/home/daniel/pp/editor-mcp/src/text_editor/server.py"],
         "env": {
           "MAX_EDIT_LINES": "100",
-          "ENABLE_JS_SYNTAX_CHECK": "0"
+          "ENABLE_JS_SYNTAX_CHECK": "0",
+          "FAIL_ON_PYTHON_SYNTAX_ERROR": "1",
+          "FAIL_ON_JS_SYNTAX_ERROR": "0"
         }
      }
   }
@@ -317,6 +325,12 @@ Environment variables:
 - `ENABLE_JS_SYNTAX_CHECK`: Controls whether JavaScript/JSX syntax checking is enabled (default: 1)
   - Set to "0", "false", or "no" to disable JavaScript syntax checking
   - Useful if you don't have Babel and related dependencies installed
+- `FAIL_ON_PYTHON_SYNTAX_ERROR`: Controls whether Python syntax errors automatically cancel the overwrite operation (default: 1)
+  - When enabled, syntax errors in Python files will cause the overwrite action to be automatically cancelled
+  - The lines will remain selected so you can fix the error and try again
+- `FAIL_ON_JS_SYNTAX_ERROR`: Controls whether JavaScript/JSX syntax errors automatically cancel the overwrite operation (default: 0)
+  - When enabled, syntax errors in JavaScript/JSX files will cause the overwrite action to be automatically cancelled
+  - The lines will remain selected so you can fix the error and try again
 
 ## Development
 
