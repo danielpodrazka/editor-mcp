@@ -163,7 +163,7 @@ class TextEditorServer:
 
             Returns:
                 dict: Dictionary containing:
-                    - lines (dict): Lines with line numbers as keys
+                    - lines (list): Lines with line numbers
                     - total_lines (int): Total number of lines in the file
                     - max_edit_lines (int): Maximum number of lines that can be edited at once
             """
@@ -172,10 +172,9 @@ class TextEditorServer:
             with open(self.current_file_path, "r", encoding="utf-8") as file:
                 lines = file.readlines()
 
-                # Format lines with line numbers as a dictionary
-                formatted_lines = {}
+                formatted_lines = []
                 for i, line in enumerate(lines, 1):
-                    formatted_lines[i] = line.rstrip()
+                    formatted_lines.append((i, line.rstrip()))
 
             return {
                 "lines": formatted_lines,
@@ -195,7 +194,7 @@ class TextEditorServer:
 
             Returns:
                 dict: Dictionary containing:
-                    - lines (dict): Lines with line numbers as keys
+                    - lines (list): Lines with line numbers
                     - start_line (int): First line number in the range
                     - end_line (int): Last line number in the range
             """
@@ -213,13 +212,15 @@ class TextEditorServer:
                 if end > len(lines):
                     end = len(lines)
                 if start > end:
-                    return {"error": "start cannot be greater than end"}
+                    return {
+                        "error": f"{start=} cannot be greater than {end=}. {len(lines)=}"
+                    }
 
                 selected_lines = lines[start - 1 : end]
 
-                formatted_lines = {}
+                formatted_lines = []
                 for i, line in enumerate(selected_lines, start):
-                    formatted_lines[i] = line.rstrip()
+                    formatted_lines.append((i, line.rstrip()))
 
                 result["lines"] = formatted_lines
                 result["start_line"] = start
@@ -375,7 +376,8 @@ class TextEditorServer:
             before = lines[: start - 1]
             after = lines[end:]
             modified_lines = before + processed_new_lines + after
-
+            diff_result = generate_diff_preview(lines, modified_lines, start, end)
+            error = None
             if self.current_file_path.endswith(".py"):
                 full_content = "".join(modified_lines)
                 try:
@@ -433,17 +435,21 @@ class TextEditorServer:
                         if not filtered_error:
                             filtered_error = "JavaScript syntax error detected"
 
-                        return {"error": f"JavaScript syntax error: {filtered_error}"}
+                        error = {
+                            "error": f"JavaScript syntax error: {filtered_error}",
+                            "diff_lines": diff_result,
+                        }
 
                 except Exception as e:
                     os.unlink(temp_path)
-                    return {"error": f"Error checking JavaScript syntax: {str(e)}"}
+                    error = {
+                        "error": f"Error checking JavaScript syntax: {str(e)}",
+                        "diff_lines": diff_result,
+                    }
 
                 finally:
                     if os.path.exists(temp_path):
                         os.unlink(temp_path)
-
-            diff_result = generate_diff_preview(lines, modified_lines, start, end)
 
             self.pending_modified_lines = modified_lines
             self.pending_diff = diff_result
@@ -455,6 +461,11 @@ class TextEditorServer:
                 "start": start,
                 "end": end,
             }
+            if error:
+                result["error"] = error
+                result["message"] = (
+                    " It looks like there is a syntax error, but you can choose to fix it in the subsequent edits."
+                )
 
             return result
 
