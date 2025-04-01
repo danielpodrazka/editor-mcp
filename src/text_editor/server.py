@@ -655,6 +655,23 @@ class TextEditorServer:
                 return {"error": f"Error searching file: {str(e)}"}
 
         @self.mcp.tool()
+        async def listdir(directory_path: str) -> Dict[str, Any]:
+            try:
+                return {
+                    "filenames": os.listdir(directory_path),
+                    "path": directory_path,
+                }
+            except NotADirectoryError as e:
+                return {
+                    "error": "Specified path is not a directory.",
+                    "path": directory_path,
+                }
+            except Exception as e:
+                return {
+                    "error": f"Unexpected error when listing the directory: {str(e)}"
+                }
+
+        @self.mcp.tool()
         async def find_function(
             function_name: str,
         ) -> Dict[str, Any]:
@@ -699,7 +716,10 @@ class TextEditorServer:
                     # Check for methods in classes
                     elif isinstance(node, ast.ClassDef):
                         for item in node.body:
-                            if isinstance(item, ast.FunctionDef) and item.name == function_name:
+                            if (
+                                isinstance(item, ast.FunctionDef)
+                                and item.name == function_name
+                            ):
                                 function_node = item
                                 class_node = node
                                 return True
@@ -707,7 +727,10 @@ class TextEditorServer:
                     elif isinstance(node, ast.FunctionDef):
                         for item in node.body:
                             # Find directly nested function definitions
-                            if isinstance(item, ast.FunctionDef) and item.name == function_name:
+                            if (
+                                isinstance(item, ast.FunctionDef)
+                                and item.name == function_name
+                            ):
                                 function_node = item
                                 # Store parent function information
                                 parent_function = node
@@ -738,7 +761,11 @@ class TextEditorServer:
                 function_def_index = -1
                 for i, token in enumerate(tokens):
                     if token.type == tokenize.NAME and token.string == function_name:
-                        if i > 0 and tokens[i-1].type == tokenize.NAME and tokens[i-1].string == "def":
+                        if (
+                            i > 0
+                            and tokens[i - 1].type == tokenize.NAME
+                            and tokens[i - 1].string == "def"
+                        ):
                             function_def_index = i
                             break
 
@@ -751,44 +778,58 @@ class TextEditorServer:
                     # Walk through all nodes inside the function to find the deepest end_lineno
                     # This handles nested functions and statements properly
                     for node in ast.walk(function_node):
-                        if hasattr(node, 'end_lineno') and node.end_lineno:
+                        if hasattr(node, "end_lineno") and node.end_lineno:
                             end_line = max(end_line, node.end_lineno)
-                    
+
                     # Specifically look for nested function definitions
                     # by checking for FunctionDef nodes within the function body
                     for node in ast.walk(function_node):
-                        if isinstance(node, ast.FunctionDef) and node is not function_node:
-                            if hasattr(node, 'end_lineno') and node.end_lineno:
+                        if (
+                            isinstance(node, ast.FunctionDef)
+                            and node is not function_node
+                        ):
+                            if hasattr(node, "end_lineno") and node.end_lineno:
                                 end_line = max(end_line, node.end_lineno)
                 else:
                     # Find the closing token of the function (either the next function/class at the same level or the end of file)
-                    indent_level = tokens[function_def_index].start[1]  # Get the indentation of the function
+                    indent_level = tokens[function_def_index].start[
+                        1
+                    ]  # Get the indentation of the function
                     in_function = False
                     nested_level = 0
-                    for token in tokens[function_def_index+1:]:
+                    for token in tokens[function_def_index + 1 :]:
                         current_line = token.start[0]
                         if current_line > start_line:
                             # Start tracking when we're inside the function body
                             if not in_function and token.string == ":":
                                 in_function = True
                                 continue
-                            
+
                             # Track nested blocks by indentation
                             if in_function:
                                 current_indent = token.start[1]
                                 # Find a token at the same indentation level as the function definition
                                 # but only if we're not in a nested block
-                                if (current_indent <= indent_level and token.type == tokenize.NAME
-                                        and token.string in ("def", "class") and nested_level == 0):
+                                if (
+                                    current_indent <= indent_level
+                                    and token.type == tokenize.NAME
+                                    and token.string in ("def", "class")
+                                    and nested_level == 0
+                                ):
                                     end_line = current_line - 1
                                     break
                                 # Track nested blocks
-                                elif current_indent > indent_level and token.type == tokenize.NAME:
+                                elif (
+                                    current_indent > indent_level
+                                    and token.type == tokenize.NAME
+                                ):
                                     if token.string in ("def", "class"):
                                         nested_level += 1
                                     # Look for the end of nested blocks
-                                elif nested_level > 0 and current_indent <= indent_level:
-                                        nested_level -= 1
+                                elif (
+                                    nested_level > 0 and current_indent <= indent_level
+                                ):
+                                    nested_level -= 1
 
                     # If we couldn't find the end, use the last line of the file
                     if end_line == 0:
@@ -800,13 +841,17 @@ class TextEditorServer:
 
                 # Adjust for methods inside classes
                 if class_node:
-                    class_body_start = min(item.lineno for item in class_node.body if hasattr(item, 'lineno'))
+                    class_body_start = min(
+                        item.lineno
+                        for item in class_node.body
+                        if hasattr(item, "lineno")
+                    )
                     if function_node.lineno == class_body_start:
                         # If this is the first method, include the class definition
                         start_line = class_node.lineno
 
                 # Normalize line numbers (1-based for API consistency)
-                function_lines = lines[start_line-1:end_line]
+                function_lines = lines[start_line - 1 : end_line]
 
                 # Format the results similar to the read tool
                 formatted_lines = []
@@ -817,9 +862,9 @@ class TextEditorServer:
                     "status": "success",
                     "lines": formatted_lines,
                     "start_line": start_line,
-                    "end_line": end_line
+                    "end_line": end_line,
                 }
-                
+
                 # Add parent function information if this is a nested function
                 if parent_function:
                     result["is_nested"] = True
