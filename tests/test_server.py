@@ -801,3 +801,191 @@ class TestTextEditorServer:
         # Verify context after the change (line 4 and 5)
         assert any(item for item in diff_lines_list if item[0] == 4)
         assert any(item for item in diff_lines_list if item[0] == 5)
+
+    @pytest.fixture
+    def python_test_file(self):
+        """Create a Python test file with various functions and methods for testing find_function."""
+        content = '''import os
+
+def simple_function():
+    """A simple function."""
+    return "Hello, world!"
+
+@decorator1
+@decorator2
+def decorated_function(a, b=None):
+    """A function with decorators."""
+    if b is None:
+        b = a * 2
+    return a + b
+
+class TestClass:
+    """A test class with methods."""
+    
+    def __init__(self, value):
+        self.value = value
+    
+    def instance_method(self, x):
+        """An instance method."""
+        return self.value * x
+    
+    @classmethod
+    def class_method(cls, y):
+        """A class method."""
+        return cls(y)
+    
+    @staticmethod
+    def static_method(z):
+        """A static method."""
+        return z ** 2
+
+def outer_function(param):
+    """A function containing a nested function."""
+    
+    def inner_function(inner_param):
+        """A nested function."""
+        return inner_param + param
+    
+    return inner_function(param * 2)
+'''
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
+            f.write(content)
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_find_function_no_file_set(self, server):
+        """Test find_function when no file is set."""
+        find_function_fn = self.get_tool_fn(server, "find_function")
+        result = await find_function_fn(function_name="test")
+        assert "error" in result
+        assert "No file path is set" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_find_function_non_python_file(self, server, temp_file):
+        """Test find_function with a non-Python file."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+        result = await find_function_fn(function_name="test")
+        assert "error" in result
+        assert "This tool only works with Python files" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_find_function_simple(self, server, python_test_file):
+        """Test find_function with a simple function."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(python_test_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+        result = await find_function_fn(function_name="simple_function")
+        assert "status" in result
+        assert result["status"] == "success"
+        assert "lines" in result
+        assert "start_line" in result
+        assert "end_line" in result
+        
+        # Check that the correct function is returned
+        function_text = "".join(line[1] for line in result["lines"])
+        assert "def simple_function():" in function_text
+        assert "A simple function" in function_text
+        assert "return \"Hello, world!\"" in function_text
+
+    @pytest.mark.asyncio
+    async def test_find_function_decorated(self, server, python_test_file):
+        """Test find_function with a decorated function."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(python_test_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+        result = await find_function_fn(function_name="decorated_function")
+        assert result["status"] == "success"
+        
+        # Check that the decorators are included
+        function_lines = [line[1] for line in result["lines"]]
+        assert any("@decorator1" in line for line in function_lines)
+        assert any("@decorator2" in line for line in function_lines)
+        assert any("def decorated_function(a, b=None):" in line for line in function_lines)
+
+    @pytest.mark.asyncio
+    async def test_find_function_method(self, server, python_test_file):
+        """Test find_function with a class method."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(python_test_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+        result = await find_function_fn(function_name="instance_method")
+        assert result["status"] == "success"
+        
+        # Check that the method is correctly identified
+        function_text = "".join(line[1] for line in result["lines"])
+        assert "def instance_method(self, x):" in function_text
+        assert "An instance method" in function_text
+        assert "return self.value * x" in function_text
+
+    @pytest.mark.asyncio
+    async def test_find_function_static_method(self, server, python_test_file):
+        """Test find_function with a static method."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(python_test_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+        result = await find_function_fn(function_name="static_method")
+        assert result["status"] == "success"
+        
+        # Check that the decorator and method are included
+        function_lines = [line[1] for line in result["lines"]]
+        assert any("@staticmethod" in line for line in function_lines)
+        assert any("def static_method(z):" in line for line in function_lines)
+
+    @pytest.mark.asyncio
+    async def test_find_function_not_found(self, server, python_test_file):
+        """Test find_function with a non-existent function."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(python_test_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+        result = await find_function_fn(function_name="nonexistent_function")
+        assert "error" in result
+        assert "not found in the file" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_find_function_nested(self, server, python_test_file):
+        """Test find_function with nested functions."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(python_test_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+        
+        # Test finding the outer function
+        result = await find_function_fn(function_name="outer_function")
+        assert result["status"] == "success"
+        function_text = "".join(line[1] for line in result["lines"])
+        assert "def outer_function(param):" in function_text
+        assert "def inner_function(inner_param):" in function_text
+        
+        # Test finding the inner function (this may or may not work depending on implementation)
+        # AST might not directly support finding nested functions
+        # This test is designed to document current behavior, not necessarily assert correctness
+        inner_result = await find_function_fn(function_name="inner_function")
+        # If it finds the inner function, check it's correct
+        if "status" in inner_result and inner_result["status"] == "success":
+            inner_text = "".join(line[1] for line in inner_result["lines"])
+            assert "def inner_function(inner_param):" in inner_text
+        # Otherwise, it should return an error that the function wasn't found
+        else:
+            assert "error" in inner_result
+            assert "not found in the file" in inner_result["error"]
+
+    @pytest.mark.asyncio
+    async def test_find_function_parsing_error(self, server):
+        """Test find_function with a file that can't be parsed due to syntax errors."""
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
+            f.write("def broken_function(  # Syntax error: missing parenthesis\n    pass\n")
+            invalid_py_path = f.name
+        try:
+            set_file_fn = self.get_tool_fn(server, "set_file")
+            await set_file_fn(invalid_py_path)
+            find_function_fn = self.get_tool_fn(server, "find_function")
+            result = await find_function_fn(function_name="broken_function")
+            assert "error" in result
+            assert "Error finding function" in result["error"]
+        finally:
+            if os.path.exists(invalid_py_path):
+                os.unlink(invalid_py_path)

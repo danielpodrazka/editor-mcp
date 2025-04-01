@@ -2,6 +2,9 @@ import hashlib
 import os
 import subprocess
 import tempfile
+import ast
+import tokenize
+import io
 from typing import Optional, Dict, Any, Union, Literal
 import black
 from black.report import NothingChanged
@@ -650,6 +653,167 @@ class TextEditorServer:
 
             except Exception as e:
                 return {"error": f"Error searching file: {str(e)}"}
+
+        @self.mcp.tool()
+        async def find_function(
+            function_name: str,
+        ) -> Dict[str, Any]:
+            """
+            Find a function or method definition in the current Python file.
+
+            This tool uses Python's AST and tokenize modules to accurately identify
+            function boundaries including decorators and docstrings.
+
+            Args:
+                function_name (str): Name of the function or method to find
+
+            Returns:
+                dict: Dictionary containing the function lines with their line numbers,
+                      start_line, and end_line
+            """
+            if self.current_file_path is None:
+                return {"error": "No file path is set. Use set_file first."}
+
+            if not self.current_file_path.endswith(".py"):
+                return {"error": "This tool only works with Python files."}
+
+            try:
+                with open(self.current_file_path, "r", encoding="utf-8") as file:
+                    source_code = file.read()
+                    lines = source_code.splitlines(True)  # Keep line endings
+
+                # Parse the source code to AST
+                tree = ast.parse(source_code)
+
+                # Find the function in the AST
+                function_node = None
+                class_node = None
+
+                # Helper function to find a function or method node
+                def find_node(node):
+                    nonlocal function_node, class_node
+                    if isinstance(node, ast.FunctionDef) and node.name == function_name:
+                        function_node = node
+                        return True
+                    # Check for methods in classes
+                    elif isinstance(node, ast.ClassDef):
+                        for item in node.body:
+                            if isinstance(item, ast.FunctionDef) and item.name == function_name:
+                                function_node = item
+                                class_node = node
+                                return True
+                    # Recursively search for nested functions/methods
+                    for child in ast.iter_child_nodes(node):
+                        if find_node(child):
+                            return True
+                    return False
+
+                # Search for the function in the AST
+                find_node(tree)
+
+                if not function_node:
+                    return {
+                        "error": f"Function or method '{function_name}' not found in the file."
+                    }
+
+                # Get the line range for the function
+                start_line = function_node.lineno
+                end_line = 0
+
+                # Find the end line by looking at tokens
+                with open(self.current_file_path, "rb") as file:
+                    tokens = list(tokenize.tokenize(file.readline))
+
+                # Find the function definition token
+                function_def_index = -1
+                for i, token in enumerate(tokens):
+                    if token.type == tokenize.NAME and token.string == function_name:
+                        if i > 0 and tokens[i-1].type == tokenize.NAME and tokens[i-1].string == "def":
+                            function_def_index = i
+                            break
+
+                if function_def_index == -1:
+                    # Fallback - use AST to determine the end
+                    # First, get the end_lineno from the function node itself
+                    end_line = function_node.end_lineno or start_line
+                    # Then walk through all nodes inside the function to find the deepest end_lineno
+                    # This handles nested functions and statements properly
+                    # Walk through all nodes inside the function to find the deepest end_lineno
+                    # This handles nested functions and statements properly
+                    for node in ast.walk(function_node):
+                        if hasattr(node, 'end_lineno') and node.end_lineno:
+                            end_line = max(end_line, node.end_lineno)
+                    
+                    # Specifically look for nested function definitions
+                    # by checking for FunctionDef nodes within the function body
+                    for node in ast.walk(function_node):
+                        if isinstance(node, ast.FunctionDef) and node is not function_node:
+                            if hasattr(node, 'end_lineno') and node.end_lineno:
+                                end_line = max(end_line, node.end_lineno)
+                else:
+                    # Find the closing token of the function (either the next function/class at the same level or the end of file)
+                    indent_level = tokens[function_def_index].start[1]  # Get the indentation of the function
+                    in_function = False
+                    nested_level = 0
+                    for token in tokens[function_def_index+1:]:
+                        current_line = token.start[0]
+                        if current_line > start_line:
+                            # Start tracking when we're inside the function body
+                            if not in_function and token.string == ":":
+                                in_function = True
+                                continue
+                            
+                            # Track nested blocks by indentation
+                            if in_function:
+                                current_indent = token.start[1]
+                                # Find a token at the same indentation level as the function definition
+                                # but only if we're not in a nested block
+                                if (current_indent <= indent_level and token.type == tokenize.NAME
+                                        and token.string in ("def", "class") and nested_level == 0):
+                                    end_line = current_line - 1
+                                    break
+                                # Track nested blocks
+                                elif current_indent > indent_level and token.type == tokenize.NAME:
+                                    if token.string in ("def", "class"):
+                                        nested_level += 1
+                                    # Look for the end of nested blocks
+                                elif nested_level > 0 and current_indent <= indent_level:
+                                        nested_level -= 1
+
+                    # If we couldn't find the end, use the last line of the file
+                    if end_line == 0:
+                        end_line = len(lines)
+
+                # Include decorators if present
+                for decorator in function_node.decorator_list:
+                    start_line = min(start_line, decorator.lineno)
+
+                # Adjust for methods inside classes
+                if class_node:
+                    class_body_start = min(item.lineno for item in class_node.body if hasattr(item, 'lineno'))
+                    if function_node.lineno == class_body_start:
+                        # If this is the first method, include the class definition
+                        start_line = class_node.lineno
+
+                # Normalize line numbers (1-based for API consistency)
+                function_lines = lines[start_line-1:end_line]
+
+                # Format the results similar to the read tool
+                formatted_lines = []
+                for i, line in enumerate(function_lines, start_line):
+                    formatted_lines.append((i, line.rstrip()))
+
+                result = {
+                    "status": "success",
+                    "lines": formatted_lines,
+                    "start_line": start_line,
+                    "end_line": end_line
+                }
+
+                return result
+
+            except Exception as e:
+                return {"error": f"Error finding function: {str(e)}"}
 
     def run(self):
         """Run the MCP server."""
