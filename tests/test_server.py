@@ -41,6 +41,7 @@ class TestTextEditorServer:
         # Define protected paths for testing
         server.protected_paths = ["*.env", "/etc/passwd", "/home/secret-file.txt"]
         return server
+
     def get_tool_fn(self, server, tool_name):
         """Helper to get the tool function from the server."""
         tools_dict = server.mcp._tool_manager._tools
@@ -56,7 +57,9 @@ class TestTextEditorServer:
         assert server.current_file_path == temp_file
 
     @pytest.mark.asyncio
-    async def test_set_file_protected_path_exact_match(self, server_with_protected_paths):
+    async def test_set_file_protected_path_exact_match(
+        self, server_with_protected_paths
+    ):
         """Test setting a file path that exactly matches a protected path."""
         set_file_fn = self.get_tool_fn(server_with_protected_paths, "set_file")
         result = await set_file_fn("/etc/passwd")
@@ -64,7 +67,9 @@ class TestTextEditorServer:
         assert server_with_protected_paths.current_file_path is None
 
     @pytest.mark.asyncio
-    async def test_set_file_protected_path_wildcard_match(self, server_with_protected_paths, monkeypatch):
+    async def test_set_file_protected_path_wildcard_match(
+        self, server_with_protected_paths, monkeypatch
+    ):
         """Test setting a file path that matches a wildcard protected path pattern."""
         # Create a temporary .env file for testing
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".env", delete=False) as f:
@@ -81,7 +86,10 @@ class TestTextEditorServer:
             set_file_fn = self.get_tool_fn(server_with_protected_paths, "set_file")
             result = await set_file_fn(env_file_path)
             assert "Error: Access to '" in result
-            assert "is denied due to PROTECTED_PATHS configuration (matches pattern '*.env')" in result
+            assert (
+                "is denied due to PROTECTED_PATHS configuration (matches pattern '*.env')"
+                in result
+            )
             assert server_with_protected_paths.current_file_path is None
         finally:
             if os.path.exists(env_file_path):
@@ -95,13 +103,17 @@ class TestTextEditorServer:
         server.protected_paths = [".env*", "config*.json", "*keys.txt"]
 
         # Create a temporary .env.local file for testing
-        with tempfile.NamedTemporaryFile(mode="w+", prefix=".env", suffix=".local", delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w+", prefix=".env", suffix=".local", delete=False
+        ) as f:
             f.write("API_KEY=test_key\n")
             env_local_path = f.name
 
         # Create a temporary config-dev.json file for testing
-        with tempfile.NamedTemporaryFile(mode="w+", prefix="config-", suffix=".json", delete=False) as f:
-            f.write("{\"debug\": true}\n")
+        with tempfile.NamedTemporaryFile(
+            mode="w+", prefix="config-", suffix=".json", delete=False
+        ) as f:
+            f.write('{"debug": true}\n')
             config_path = f.name
 
         # Create a custom filename that will definitely match our pattern
@@ -118,23 +130,32 @@ class TestTextEditorServer:
 
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
-            
+
             # Test .env* pattern
             result = await set_file_fn(env_local_path)
             assert "Error: Access to '" in result
-            assert "is denied due to PROTECTED_PATHS configuration (matches pattern '.env*'" in result
+            assert (
+                "is denied due to PROTECTED_PATHS configuration (matches pattern '.env*'"
+                in result
+            )
             assert server.current_file_path is None
-            
+
             # Test config*.json pattern
             result = await set_file_fn(config_path)
             assert "Error: Access to '" in result
-            assert "is denied due to PROTECTED_PATHS configuration (matches pattern 'config*.json'" in result
+            assert (
+                "is denied due to PROTECTED_PATHS configuration (matches pattern 'config*.json'"
+                in result
+            )
             assert server.current_file_path is None
-            
+
             # Test *keys.txt pattern
             result = await set_file_fn(secret_path)
             assert "Error: Access to '" in result
-            assert "is denied due to PROTECTED_PATHS configuration (matches pattern '*keys.txt'" in result
+            assert (
+                "is denied due to PROTECTED_PATHS configuration (matches pattern '*keys.txt'"
+                in result
+            )
             assert server.current_file_path is None
         finally:
             # Clean up temp files
@@ -143,7 +164,9 @@ class TestTextEditorServer:
                     os.unlink(path)
 
     @pytest.mark.asyncio
-    async def test_set_file_non_protected_path(self, server_with_protected_paths, temp_file):
+    async def test_set_file_non_protected_path(
+        self, server_with_protected_paths, temp_file
+    ):
         """Test setting a file path that does not match any protected paths."""
         set_file_fn = self.get_tool_fn(server_with_protected_paths, "set_file")
         result = await set_file_fn(temp_file)
@@ -430,7 +453,7 @@ class TestTextEditorServer:
         select_result = await select_fn(2, 4)
         assert select_result["status"] == "success"
         assert "id" in select_result
-        
+
         # Create overwrite preview
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         new_lines = {"lines": ["New Line 2", "New Line 3", "New Line 4"]}
@@ -438,28 +461,29 @@ class TestTextEditorServer:
         assert "status" in result
         assert result["status"] == "preview"
         assert "Changes ready to apply" in result["message"]
-        
+
         # Get original content to verify it remains unchanged
         with open(temp_file, "r") as f:
             original_content = f.read()
-        
+
         # Cancel the changes
         cancel_fn = self.get_tool_fn(server, "cancel")
         cancel_result = await cancel_fn()
         assert cancel_result["status"] == "success"
         assert "Changes cancelled" in cancel_result["message"]
-        
+
         # Verify the file content is unchanged
         with open(temp_file, "r") as f:
             file_content = f.read()
         assert file_content == original_content
-        
+
         # Verify that selected lines are still available
         assert server.selected_start == 2
         assert server.selected_end == 4
         assert server.selected_id is not None
         assert server.pending_modified_lines is None
         assert server.pending_diff is None
+
     @pytest.mark.asyncio
     async def test_select_invalid_range(self, server, temp_file):
         """Test select with invalid line ranges."""
@@ -1008,14 +1032,17 @@ def outer_function(param):
         assert "No file path is set" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_find_function_non_python_file(self, server, temp_file):
-        """Test find_function with a non-Python file."""
+    async def test_find_function_non_supported_file(self, server, temp_file):
+        """Test find_function with a non-supported file type."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
         find_function_fn = self.get_tool_fn(server, "find_function")
         result = await find_function_fn(function_name="test")
         assert "error" in result
-        assert "This tool only works with Python files" in result["error"]
+        assert (
+            "This tool only works with Python (.py) or JavaScript/JSX (.js, .jsx) files"
+            in result["error"]
+        )
 
     @pytest.mark.asyncio
     async def test_find_function_simple(self, server, python_test_file):
@@ -1029,12 +1056,12 @@ def outer_function(param):
         assert "lines" in result
         assert "start_line" in result
         assert "end_line" in result
-        
+
         # Check that the correct function is returned
         function_text = "".join(line[1] for line in result["lines"])
         assert "def simple_function():" in function_text
         assert "A simple function" in function_text
-        assert "return \"Hello, world!\"" in function_text
+        assert 'return "Hello, world!"' in function_text
 
     @pytest.mark.asyncio
     async def test_find_function_decorated(self, server, python_test_file):
@@ -1044,12 +1071,14 @@ def outer_function(param):
         find_function_fn = self.get_tool_fn(server, "find_function")
         result = await find_function_fn(function_name="decorated_function")
         assert result["status"] == "success"
-        
+
         # Check that the decorators are included
         function_lines = [line[1] for line in result["lines"]]
         assert any("@decorator1" in line for line in function_lines)
         assert any("@decorator2" in line for line in function_lines)
-        assert any("def decorated_function(a, b=None):" in line for line in function_lines)
+        assert any(
+            "def decorated_function(a, b=None):" in line for line in function_lines
+        )
 
     @pytest.mark.asyncio
     async def test_find_function_method(self, server, python_test_file):
@@ -1059,7 +1088,7 @@ def outer_function(param):
         find_function_fn = self.get_tool_fn(server, "find_function")
         result = await find_function_fn(function_name="instance_method")
         assert result["status"] == "success"
-        
+
         # Check that the method is correctly identified
         function_text = "".join(line[1] for line in result["lines"])
         assert "def instance_method(self, x):" in function_text
@@ -1074,7 +1103,7 @@ def outer_function(param):
         find_function_fn = self.get_tool_fn(server, "find_function")
         result = await find_function_fn(function_name="static_method")
         assert result["status"] == "success"
-        
+
         # Check that the decorator and method are included
         function_lines = [line[1] for line in result["lines"]]
         assert any("@staticmethod" in line for line in function_lines)
@@ -1089,11 +1118,15 @@ def outer_function(param):
         result = await find_function_fn(function_name="nonexistent_function")
         assert "error" in result
         assert "not found in the file" in result["error"]
+
     @pytest.mark.asyncio
     async def test_protect_paths_env_variable(self, monkeypatch):
         """Test that the PROTECTED_PATHS environment variable is correctly processed."""
         # Set up the environment variable with test paths
-        monkeypatch.setenv("PROTECTED_PATHS", "*.secret,.env*,config*.json,*sensitive*,/etc/shadow,/home/user/.ssh/id_rsa")
+        monkeypatch.setenv(
+            "PROTECTED_PATHS",
+            "*.secret,.env*,config*.json,*sensitive*,/etc/shadow,/home/user/.ssh/id_rsa",
+        )
 
         # Create a new server instance which should read the environment variable
         server = TextEditorServer()
@@ -1123,7 +1156,9 @@ def outer_function(param):
     async def test_protect_paths_trimming(self, monkeypatch):
         """Test that whitespace in PROTECTED_PATHS items is properly trimmed."""
         # Set up the environment variable with whitespace
-        monkeypatch.setenv("PROTECTED_PATHS", " *.secret , /etc/shadow ,  /home/user/.ssh/id_rsa ")
+        monkeypatch.setenv(
+            "PROTECTED_PATHS", " *.secret , /etc/shadow ,  /home/user/.ssh/id_rsa "
+        )
 
         # Create a new server instance
         server = TextEditorServer()
@@ -1147,14 +1182,14 @@ def outer_function(param):
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(python_test_file)
         find_function_fn = self.get_tool_fn(server, "find_function")
-        
+
         # Test finding the outer function
         result = await find_function_fn(function_name="outer_function")
         assert result["status"] == "success"
         function_text = "".join(line[1] for line in result["lines"])
         assert "def outer_function(param):" in function_text
         assert "def inner_function(inner_param):" in function_text
-        
+
         # Test finding the inner function (this may or may not work depending on implementation)
         # AST might not directly support finding nested functions
         # This test is designed to document current behavior, not necessarily assert correctness
@@ -1172,7 +1207,9 @@ def outer_function(param):
     async def test_find_function_parsing_error(self, server):
         """Test find_function with a file that can't be parsed due to syntax errors."""
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
-            f.write("def broken_function(  # Syntax error: missing parenthesis\n    pass\n")
+            f.write(
+                "def broken_function(  # Syntax error: missing parenthesis\n    pass\n"
+            )
             invalid_py_path = f.name
         try:
             set_file_fn = self.get_tool_fn(server, "set_file")
@@ -1184,3 +1221,272 @@ def outer_function(param):
         finally:
             if os.path.exists(invalid_py_path):
                 os.unlink(invalid_py_path)
+
+    @pytest.mark.asyncio
+    async def test_find_function_javascript(
+        self, server, javascript_test_file, monkeypatch
+    ):
+        """Test find_function with JavaScript functions."""
+
+        # Mock subprocess.run to avoid external dependency in tests
+        def mock_subprocess_run(*args, **kwargs):
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stderr = ""
+                    self.stdout = ""
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(javascript_test_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+
+        # Test regular function
+        result = await find_function_fn(function_name="simpleFunction")
+        assert result["status"] == "success"
+        # Get all the lines of the function
+        function_lines = [line[1] for line in result["lines"]]
+        assert any("function simpleFunction()" in line for line in function_lines)
+        assert any("console.log('Hello world')" in line for line in function_lines)
+
+        # Test arrow function
+        result = await find_function_fn(function_name="arrowFunction")
+        assert result["status"] == "success"
+        function_lines = [line[1] for line in result["lines"]]
+        assert any("const arrowFunction = (a, b) =>" in line for line in function_lines)
+
+        # Test async function
+        result = await find_function_fn(function_name="asyncFunction")
+        assert result["status"] == "success"
+        function_lines = [line[1] for line in result["lines"]]
+        assert any("async function asyncFunction()" in line for line in function_lines)
+
+        # Test hook-style function
+        result = await find_function_fn(function_name="useCustomHook")
+        assert result["status"] == "success"
+        function_lines = [line[1] for line in result["lines"]]
+        assert any(
+            "const useCustomHook = useCallback" in line for line in function_lines
+        )
+
+        result = await find_function_fn(function_name="methodFunction")
+
+        function_lines = [line[1] for line in result["lines"]]
+        assert any("methodFunction(x, y)" in line for line in function_lines)
+
+        result = await find_function_fn(function_name="nonExistentFunction")
+        assert "error" in result
+        assert "not found in the file" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_find_function_jsx(self, server, jsx_test_file, monkeypatch):
+        """Test find_function with JSX/React component functions."""
+
+        def mock_subprocess_run(*args, **kwargs):
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stderr = ""
+                    self.stdout = ""
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(jsx_test_file)
+        find_function_fn = self.get_tool_fn(server, "find_function")
+
+        # Test regular function component
+        result = await find_function_fn(function_name="SimpleComponent")
+        assert result["status"] == "success"
+        # Get all the lines of the component
+        function_lines = [line[1] for line in result["lines"]]
+        # Just check that the function name is found
+        assert "SimpleComponent" in "".join(function_lines)
+
+        # Test arrow function component
+        result = await find_function_fn(function_name="ArrowComponent")
+        assert result["status"] == "success"
+        # Get all the lines of the component
+        function_lines = [line[1] for line in result["lines"]]
+        # Only check that we found the function declaration
+        assert "ArrowComponent" in "".join(function_lines)
+
+        # Test component with nested function
+        result = await find_function_fn(function_name="ParentComponent")
+        assert result["status"] == "success"
+        # Get all the lines of the component
+        function_lines = [line[1] for line in result["lines"]]
+        assert any("function ParentComponent()" in line for line in function_lines)
+        assert any("function handleClick()" in line for line in function_lines)
+
+        # Test higher order component
+        result = await find_function_fn(function_name="withLogger")
+        assert result["status"] == "success"
+        # Get all the lines of the component
+        function_lines = [line[1] for line in result["lines"]]
+        assert any("function withLogger(Component)" in line for line in function_lines)
+        assert any(
+            "return function EnhancedComponent(props)" in line
+            for line in function_lines
+        )
+
+        # Test nested function may or may not work depending on implementation
+        result = await find_function_fn(function_name="handleClick")
+        if "status" in result and result["status"] == "success":
+            function_lines = [line[1] for line in result["lines"]]
+            assert any("function handleClick()" in line for line in function_lines)
+        else:
+            assert "error" in result
+
+        # Test non-existent function
+        result = await find_function_fn(function_name="nonExistentComponent")
+        assert "error" in result
+        assert "not found in the file" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_find_function_js_with_disabled_check(self, server, monkeypatch):
+        """Test find_function with disabled JavaScript syntax checking."""
+        # Create a server with disabled JS syntax checking
+        monkeypatch.setenv("ENABLE_JS_SYNTAX_CHECK", "0")
+        server_no_js_check = TextEditorServer()
+
+        # Create a basic JavaScript file
+        js_content = "function testFunc() { return 'test'; }"
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".js", delete=False) as f:
+            f.write(js_content)
+            js_file_path = f.name
+
+        try:
+            # This test ensures find_function still works even when JavaScript
+            # syntax checking is disabled for overwrite operations
+            set_file_fn = self.get_tool_fn(server_no_js_check, "set_file")
+            await set_file_fn(js_file_path)
+            find_function_fn = self.get_tool_fn(server_no_js_check, "find_function")
+
+            result = await find_function_fn(function_name="testFunc")
+            assert result["status"] == "success"
+            function_lines = [line[1] for line in result["lines"]]
+            assert any("function testFunc()" in line for line in function_lines)
+        finally:
+            if os.path.exists(js_file_path):
+                os.unlink(js_file_path)
+
+    @pytest.fixture
+    def javascript_test_file(self):
+        """Create a JavaScript test file with various functions for testing find_function."""
+        content = """// Sample JavaScript file with different function types
+
+// Regular function declaration
+function simpleFunction() {
+  console.log('Hello world');
+  return 42;
+}
+
+// Arrow function expression
+const arrowFunction = (a, b) => {
+  const sum = a + b;
+  return sum;
+};
+
+// Object with method
+const obj = {
+  methodFunction(x, y) {
+    return x * y;
+  },
+
+  // Object method as arrow function
+  arrowMethod: (z) => {
+    return z * z;
+  }
+};
+
+// Async function
+async function asyncFunction() {
+  return await Promise.resolve('done');
+}
+
+// React hook style function
+const useCustomHook = useCallback((value) => {
+  return value.toUpperCase();
+}, []);
+
+// Class with methods
+class TestClass {
+  constructor(value) {
+    this.value = value;
+  }
+
+  instanceMethod() {
+    return this.value;
+  }
+
+  static staticMethod() {
+    return 'static';
+  }
+}
+"""
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".js", delete=False) as f:
+            f.write(content)
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.fixture
+    def jsx_test_file(self):
+        """Create a JSX test file with various component functions for testing find_function."""
+        content = """import React, { useState, useEffect } from 'react';
+
+// Function component
+function SimpleComponent() {
+  return <div>Hello World</div>;
+}
+
+// Arrow function component with props
+const ArrowComponent = ({ name }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    document.title = `${name}: ${count}`;
+  }, [name, count]);
+
+  return (
+    <div>
+      <h1>Hello {name}</h1>
+      <button onClick={() => setCount(count + 1)}>
+        Count: {count}
+      </button>
+    </div>
+  );
+};
+
+// Component with nested function
+function ParentComponent() {
+  function handleClick() {
+    console.log('Button clicked');
+  }
+
+  return <button onClick={handleClick}>Click me</button>;
+}
+
+// Higher order component
+function withLogger(Component) {
+  return function EnhancedComponent(props) {
+    console.log('Component rendered with props:', props);
+    return <Component {...props} />;
+  };
+}
+
+export default SimpleComponent;
+"""
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".jsx", delete=False) as f:
+            f.write(content)
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
