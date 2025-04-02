@@ -9,6 +9,7 @@ A Python-based text editor server built with FastMCP that provides tools for fil
   - Read entire files with line numbers using `skim`
   - Read specific line ranges with prefixed line numbers using `read`
   - Find specific text within files using `find_line`
+  - Find and extract function definitions in Python and JavaScript/JSX files using `find_function`
 - **Edit Operations**:
   - Two-step editing process with diff preview
   - Select and overwrite text with ID verification
@@ -328,6 +329,35 @@ Find lines that match provided text in the current file.
 - Returns an error if no file path is set
 - Searches for exact text matches within each line
 - The id can be used for subsequent edit operations
+
+#### 11. `find_function`
+Find a function or method definition in the current Python or JavaScript/JSX file.
+
+**Parameters**:
+- `function_name` (str): Name of the function or method to find
+
+**Returns**:
+- Dictionary containing the function lines with their line numbers, start_line, and end_line
+
+**Example output**:
+```
+{
+  "status": "success",
+  "lines": [
+    [10, "def hello():"],
+    [11, "    print(\"Hello, world!\")"],
+    [12, "    return True"]
+  ],
+  "start_line": 10,
+  "end_line": 12
+}
+```
+
+**Note**:
+- For Python files, this tool uses Python's AST and tokenize modules to accurately identify function boundaries including decorators and docstrings
+- For JavaScript/JSX files, this tool uses regex pattern matching to identify function declarations and their boundaries
+- Supports standard JavaScript functions, async functions, arrow functions, and React hooks like useCallback
+- Returns an error if no file path is set or if the function is not found
 ## Configuration
 
 Environment variables:
@@ -466,7 +496,7 @@ The main `TextEditorServer` class:
 1. Initializes with a FastMCP instance named "text-editor"
 2. Sets a configurable `max_edit_lines` limit (default: 50) from environment variables
 3. Maintains the current file path as state
-4. Registers ten primary tools through FastMCP:
+4. Registers eleven primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
    - `skim`: Reads the entire content of a file, returning a dictionary of line numbers to line text
    - `read`: Reads lines from specified line range, returning a structured dictionary of line content
@@ -477,6 +507,7 @@ The main `TextEditorServer` class:
    - `delete_file`: Deletes the current file
    - `new_file`: Creates a new file
    - `find_line`: Finds lines containing specific text
+   - `find_function`: Finds function or method definitions in Python and JavaScript/JSX files
 
 The server runs using FastMCP's stdio transport by default, making it easy to integrate with various clients.
 
