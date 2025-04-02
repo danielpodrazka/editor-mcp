@@ -135,7 +135,11 @@ class TextEditorServer:
         self.fail_on_js_syntax_error = os.getenv(
             "FAIL_ON_JS_SYNTAX_ERROR", "0"
         ).lower() in ["1", "true", "yes"]
-        self.protected_paths = os.getenv("PROTECTED_PATHS", "").split(",") if os.getenv("PROTECTED_PATHS") else []
+        self.protected_paths = (
+            os.getenv("PROTECTED_PATHS", "").split(",")
+            if os.getenv("PROTECTED_PATHS")
+            else []
+        )
         self.current_file_path = None
         self.selected_start = None
         self.selected_end = None
@@ -176,11 +180,11 @@ class TextEditorServer:
                 if absolute_file_path == pattern:
                     return f"Error: Access to '{absolute_file_path}' is denied due to PROTECTED_PATHS configuration"
                 # Check for glob pattern match (e.g., *.env, .env*, etc.)
-                if '*' in pattern:
+                if "*" in pattern:
                     # First try matching the full path
                     if fnmatch.fnmatch(absolute_file_path, pattern):
                         return f"Error: Access to '{absolute_file_path}' is denied due to PROTECTED_PATHS configuration (matches pattern '{pattern}')"
-                    
+
                     # Then try matching just the basename
                     basename = os.path.basename(absolute_file_path)
                     if fnmatch.fnmatch(basename, pattern):
@@ -512,8 +516,8 @@ class TextEditorServer:
                         "Changes automatically cancelled due to syntax error. The lines are still selected."
                     )
                 else:
-                    result["message"] = (
-                        "It looks like there is a syntax error, but you can choose to fix it in the subsequent edits."
+                    result["message"] += (
+                        " It looks like there is a syntax error, but you can choose to fix it in the subsequent edits."
                     )
 
             return result
@@ -692,10 +696,13 @@ class TextEditorServer:
             function_name: str,
         ) -> Dict[str, Any]:
             """
-            Find a function or method definition in the current Python file.
+            Find a function or method definition in the current Python or JavaScript/JSX file.
 
-            This tool uses Python's AST and tokenize modules to accurately identify
+            For Python files, this tool uses Python's AST and tokenize modules to accurately identify
             function boundaries including decorators and docstrings.
+
+            For JavaScript/JSX files, this tool uses regex pattern matching to identify function
+            declarations and their boundaries.
 
             Args:
                 function_name (str): Name of the function or method to find
@@ -707,15 +714,25 @@ class TextEditorServer:
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
 
-            if not self.current_file_path.endswith(".py"):
-                return {"error": "This tool only works with Python files."}
+            # Check if the file is a supported type (Python or JavaScript/JSX)
+            is_python = self.current_file_path.endswith(".py")
+            is_javascript = self.current_file_path.endswith((".js", ".jsx"))
+
+            if not (is_python or is_javascript):
+                return {
+                    "error": "This tool only works with Python (.py) or JavaScript/JSX (.js, .jsx) files."
+                }
 
             try:
                 with open(self.current_file_path, "r", encoding="utf-8") as file:
                     source_code = file.read()
                     lines = source_code.splitlines(True)  # Keep line endings
 
-                # Parse the source code to AST
+                # Process JavaScript/JSX files using regex
+                if is_javascript:
+                    return self._find_js_function(function_name, source_code, lines)
+
+                # For Python files, parse the source code to AST
                 tree = ast.parse(source_code)
 
                 # Find the function in the AST
@@ -890,6 +907,145 @@ class TextEditorServer:
 
             except Exception as e:
                 return {"error": f"Error finding function: {str(e)}"}
+
+    def _find_js_function(
+        self, function_name: str, source_code: str, lines: list
+    ) -> Dict[str, Any]:
+        """
+        Helper method to find JavaScript/JSX function definitions using regex.
+
+        Args:
+            function_name (str): Name of the function to find
+            source_code (str): Source code content
+            lines (list): Source code split by lines with line endings preserved
+
+        Returns:
+            dict: Dictionary with function information
+        """
+        try:
+            # Pattern for named function declaration
+            # Matches: function functionName(args) { body }
+            # Also matches: async function functionName(args) { body }
+            function_pattern = re.compile(
+                r"(?:async\s+)?function\s+(?P<functionName>\w+)\s*\((?P<functionArguments>[^()]*)\)\s*{",
+                re.MULTILINE,
+            )
+
+            # Pattern for arrow functions with explicit name
+            # Matches: const functionName = (args) => { body } or const functionName = args => { body }
+            # Also matches async variants: const functionName = async (args) => { body }
+            # Also matches component inner functions: const innerFunction = async () => { ... }
+            arrow_pattern = re.compile(
+                r"(?:(?:const|let|var)\s+)?(?P<functionName>\w+)\s*=\s*(?:async\s+)?(?:\((?P<functionArguments>[^()]*)\)|(?P<singleArg>\w+))\s*=>\s*{",
+                re.MULTILINE,
+            )
+
+            # Pattern for object method definitions
+            # Matches: functionName(args) { body } in object literals or classes
+            # Also matches: async functionName(args) { body }
+            method_pattern = re.compile(
+                r"(?:^|,|{)\s*(?:async\s+)?(?P<functionName>\w+)\s*\((?P<functionArguments>[^()]*)\)\s*{",
+                re.MULTILINE,
+            )
+
+            # Pattern for React hooks like useCallback, useEffect, etc.
+            # Matches: const functionName = useCallback(async () => { ... }, [deps])
+            hook_pattern = re.compile(
+                r"const\s+(?P<functionName>\w+)\s*=\s*use\w+\((?:async\s+)?\(?[^{]*\)?\s*=>[^{]*{",
+                re.MULTILINE,
+            )
+
+            # Search for the function
+            matches = []
+
+            # Check all patterns
+            for pattern in [function_pattern, arrow_pattern, method_pattern, hook_pattern]:
+                for match in pattern.finditer(source_code):
+                    if match.groupdict().get("functionName") == function_name:
+                        matches.append(match)
+
+            if not matches:
+                return {"error": f"Function '{function_name}' not found in the file."}
+
+            # Use the first match
+            match = matches[0]
+            start_pos = match.start()
+
+            # Find the line number for the start
+            start_line = 1
+            pos = 0
+            for i, line in enumerate(lines, 1):
+                next_pos = pos + len(line)
+                if pos <= start_pos < next_pos:
+                    start_line = i
+                    break
+                pos = next_pos
+
+            # Find the closing brace that matches the opening brace of the function
+            # Count the number of opening and closing braces
+            brace_count = 0
+            end_pos = start_pos
+            in_string = False
+            string_delimiter = None
+            escaped = False
+
+            for i in range(start_pos, len(source_code)):
+                char = source_code[i]
+
+                # Handle strings to avoid counting braces inside strings
+                if not escaped and char in ['"', "'", "`"]:
+                    if not in_string:
+                        in_string = True
+                        string_delimiter = char
+                    elif char == string_delimiter:
+                        in_string = False
+
+                # Check for escape character
+                if char == "\\" and not escaped:
+                    escaped = True
+                    continue
+
+                escaped = False
+
+                # Only count braces outside of strings
+                if not in_string:
+                    if char == "{":
+                        brace_count += 1
+                    elif char == "}":
+                        brace_count -= 1
+                        if brace_count == 0:
+                            end_pos = i + 1  # Include the closing brace
+                            break
+
+            # Find the end line number
+            end_line = 1
+            pos = 0
+            for i, line in enumerate(lines, 1):
+                next_pos = pos + len(line)
+                if pos <= end_pos < next_pos:
+                    end_line = i
+                    break
+                pos = next_pos
+
+            # Extract the function lines
+            function_lines = lines[start_line - 1 : end_line]
+
+            # Format results like the read tool
+            formatted_lines = []
+            for i, line in enumerate(function_lines, start_line):
+                formatted_lines.append((i, line.rstrip()))
+
+            result = {
+                "status": "success",
+                "lines": formatted_lines,
+                "start_line": start_line,
+                "end_line": end_line,
+            }
+
+            return result
+
+        except Exception as e:
+            return {"error": f"Error finding JavaScript function: {str(e)}"}
 
     def run(self):
         """Run the MCP server."""
