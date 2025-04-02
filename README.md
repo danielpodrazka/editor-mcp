@@ -12,7 +12,7 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 - **Edit Operations**:
   - Two-step editing process with diff preview
   - Select and overwrite text with ID verification
-  - Clean editing workflow with select → overwrite → decide pattern
+  - Clean editing workflow with select → overwrite → confirm/cancel pattern
   - Syntax checking for Python (.py) and JavaScript/React (.js, .jsx) files
   - Create new files with content
 - **File Management**:
@@ -256,32 +256,39 @@ Prepare to overwrite a range of lines in the current file with new text.
 **Note**:
 - This is the first step in a two-step process:
   1. First call overwrite() to generate a diff preview
-  2. Then call decide() to accept or cancel the pending changes
+  2. Then call confirm() to apply or cancel() to discard the pending changes
 - This tool allows replacing the previously selected lines with new content
 - The number of new lines can differ from the original selection
 - For Python files (.py extension), syntax checking is performed before writing
 - For JavaScript/React files (.js, .jsx extensions), syntax checking is optional and can be disabled via the `ENABLE_JS_SYNTAX_CHECK` environment variable
 
-#### 6. `decide`
-Apply or cancel pending changes from the overwrite operation.
-
-**Parameters**:
-- `decision` (str): Either 'accept' to apply changes or 'cancel' to discard them
+#### 6. `confirm`
+Apply pending changes from the overwrite operation.
 
 **Returns**:
 - Operation result with status and message
 
 **Note**:
-- This is the second step in the two-step process after using overwrite
+- This is one of the two possible actions in the second step of the editing process
 - The selection is removed upon successful application of changes
 
-#### 7. `delete_file`
+#### 7. `cancel`
+Discard pending changes from the overwrite operation.
+
+**Returns**:
+- Operation result with status and message
+
+**Note**:
+- This is one of the two possible actions in the second step of the editing process
+- The selection remains intact when changes are cancelled
+
+#### 8. `delete_file`
 Delete the currently set file.
 
 **Returns**:
 - Operation result with status and message
 
-#### 8. `new_file`
+#### 9. `new_file`
 Creates a new file.
 
 **Parameters**:
@@ -293,7 +300,7 @@ Creates a new file.
 **Note**:
 - This tool will fail if the current file exists and is not empty
 
-#### 9. `find_line`
+#### 10. `find_line`
 Find lines that match provided text in the current file.
 
 **Parameters**:
@@ -413,7 +420,7 @@ The test suite covers:
    - Syntax checking for Python and JavaScript/React files
    - Generation of diff preview for changes
 
-5. **decide tool**
+5. **confirm and cancel tools**
    - Applying or canceling pending changes
    - Two-step verification process
    
@@ -442,7 +449,7 @@ Unlike traditional code editing approaches where LLMs simply search for lines to
 3. **read** - The LLM examines specific sections relevant to the task, with lines shown alongside numbers for better context
 4. **select** - When ready to edit, the LLM selects specific lines (limited to a configurable number, default 50)
 5. **overwrite** - The LLM proposes replacement content, resulting in a git diff-style preview that shows exactly what will change
-6. **decide** - After reviewing the preview, the LLM can accept or cancel the changes
+6. **confirm/cancel** - After reviewing the preview, the LLM can either apply or discard the changes
 
 This structured workflow forces the LLM to reason carefully about each edit and prevents common errors like accidentally overwriting entire files. By seeing previews of changes before committing them, the LLM can verify its edits are correct.
 
@@ -459,13 +466,14 @@ The main `TextEditorServer` class:
 1. Initializes with a FastMCP instance named "text-editor"
 2. Sets a configurable `max_edit_lines` limit (default: 50) from environment variables
 3. Maintains the current file path as state
-4. Registers nine primary tools through FastMCP:
+4. Registers ten primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
    - `skim`: Reads the entire content of a file, returning a dictionary of line numbers to line text
    - `read`: Reads lines from specified line range, returning a structured dictionary of line content
    - `select`: Selects lines for subsequent overwrite operation
    - `overwrite`: Takes a list of new lines and prepares diff preview for changing content
-   - `decide`: Applies or cancels pending changes
+   - `confirm`: Applies pending changes from the overwrite operation
+   - `cancel`: Discards pending changes from the overwrite operation
    - `delete_file`: Deletes the current file
    - `new_file`: Creates a new file
    - `find_line`: Finds lines containing specific text

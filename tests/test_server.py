@@ -411,15 +411,55 @@ class TestTextEditorServer:
         assert "status" in result
         assert result["status"] == "preview"
         assert "Changes ready to apply" in result["message"]
-        decide_fn = self.get_tool_fn(server, "decide")
-        decide_result = await decide_fn(decision="accept")
-        assert decide_result["status"] == "success"
-        assert "Changes applied successfully" in decide_result["message"]
+        confirm_fn = self.get_tool_fn(server, "confirm")
+        confirm_result = await confirm_fn()
+        assert confirm_result["status"] == "success"
+        assert "Changes applied successfully" in confirm_result["message"]
         with open(temp_file, "r") as f:
             file_content = f.read()
         expected_content = "Line 1\nNew Line 2\nNew Line 3\nNew Line 4\nLine 5\n"
         assert file_content == expected_content
 
+    @pytest.mark.asyncio
+    async def test_overwrite_cancel(self, server, temp_file):
+        """Test overwrite with cancel operation."""
+        # Set up initial state
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+        select_fn = self.get_tool_fn(server, "select")
+        select_result = await select_fn(2, 4)
+        assert select_result["status"] == "success"
+        assert "id" in select_result
+        
+        # Create overwrite preview
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        new_lines = {"lines": ["New Line 2", "New Line 3", "New Line 4"]}
+        result = await overwrite_fn(new_lines=new_lines)
+        assert "status" in result
+        assert result["status"] == "preview"
+        assert "Changes ready to apply" in result["message"]
+        
+        # Get original content to verify it remains unchanged
+        with open(temp_file, "r") as f:
+            original_content = f.read()
+        
+        # Cancel the changes
+        cancel_fn = self.get_tool_fn(server, "cancel")
+        cancel_result = await cancel_fn()
+        assert cancel_result["status"] == "success"
+        assert "Changes cancelled" in cancel_result["message"]
+        
+        # Verify the file content is unchanged
+        with open(temp_file, "r") as f:
+            file_content = f.read()
+        assert file_content == original_content
+        
+        # Verify that selected lines are still available
+        assert server.selected_start == 2
+        assert server.selected_end == 4
+        assert server.selected_id is not None
+        assert server.pending_modified_lines is None
+        assert server.pending_diff is None
     @pytest.mark.asyncio
     async def test_select_invalid_range(self, server, temp_file):
         """Test select with invalid line ranges."""
@@ -464,9 +504,9 @@ class TestTextEditorServer:
         new_lines = {"lines": ["New Line 2", "Extra Line", "New Line 3"]}
         result = await overwrite_fn(new_lines=new_lines)
         assert result["status"] == "preview"
-        decide_fn = self.get_tool_fn(server, "decide")
-        decide_result = await decide_fn(decision="accept")
-        assert decide_result["status"] == "success"
+        confirm_fn = self.get_tool_fn(server, "confirm")
+        confirm_result = await confirm_fn()
+        assert confirm_result["status"] == "success"
         with open(temp_file, "r") as f:
             file_content = f.read()
         expected_content = (
@@ -478,8 +518,8 @@ class TestTextEditorServer:
         new_content = "Single Line\n"
         result = await overwrite_fn(new_lines={"lines": ["Single Line"]})
         assert result["status"] == "preview"
-        decide_result = await decide_fn(decision="accept")
-        assert decide_result["status"] == "success"
+        confirm_result = await confirm_fn()
+        assert confirm_result["status"] == "success"
         with open(temp_file, "r") as f:
             file_content = f.read()
         assert file_content == "Single Line\n"
@@ -495,9 +535,9 @@ class TestTextEditorServer:
         overwrite_fn = self.get_tool_fn(server, "overwrite")
         result = await overwrite_fn(new_lines={"lines": []})
         assert result["status"] == "preview"
-        decide_fn = self.get_tool_fn(server, "decide")
-        decide_result = await decide_fn(decision="accept")
-        assert decide_result["status"] == "success"
+        confirm_fn = self.get_tool_fn(server, "confirm")
+        confirm_result = await confirm_fn()
+        assert confirm_result["status"] == "success"
         with open(temp_file, "r") as f:
             file_content = f.read()
         expected_content = "Line 1\nLine 4\nLine 5\n"
@@ -569,11 +609,11 @@ class TestTextEditorServer:
         result = await overwrite_fn(new_lines={"lines": ["New content"]})
         assert "status" in result
         assert result["status"] == "preview"
-        decide_fn = self.get_tool_fn(server, "decide")
-        decide_result = await decide_fn(decision="accept")
-        assert "error" in decide_result
-        assert "Error writing to file" in decide_result["error"]
-        assert "Mock file write error" in decide_result["error"]
+        confirm_fn = self.get_tool_fn(server, "confirm")
+        confirm_result = await confirm_fn()
+        assert "error" in confirm_result
+        assert "Error writing to file" in confirm_result["error"]
+        assert "Mock file write error" in confirm_result["error"]
 
     @pytest.mark.asyncio
     async def test_overwrite_newline_handling(self, server):
@@ -590,9 +630,9 @@ class TestTextEditorServer:
             overwrite_fn = self.get_tool_fn(server, "overwrite")
             result = await overwrite_fn(new_lines={"lines": ["New Line 2"]})
             assert result["status"] == "preview"
-            decide_fn = self.get_tool_fn(server, "decide")
-            decide_result = await decide_fn(decision="accept")
-            assert decide_result["status"] == "success"
+            confirm_fn = self.get_tool_fn(server, "confirm")
+            confirm_result = await confirm_fn()
+            assert confirm_result["status"] == "success"
             with open(temp_path, "r") as f:
                 file_content = f.read()
             expected_content = "Line 1\nNew Line 2\nLine 3"
@@ -627,10 +667,10 @@ class TestTextEditorServer:
             }
             result = await overwrite_fn(new_lines=new_content)
             assert result["status"] == "preview"
-            decide_fn = self.get_tool_fn(server, "decide")
-            decide_result = await decide_fn(decision="accept")
-            assert decide_result["status"] == "success"
-            assert "Changes applied successfully" in decide_result["message"]
+            confirm_fn = self.get_tool_fn(server, "confirm")
+            confirm_result = await confirm_fn()
+            assert confirm_result["status"] == "success"
+            assert "Changes applied successfully" in confirm_result["message"]
             with open(py_file_path, "r") as f:
                 file_content = f.read()
             expected_content = "def greeting(name):\n    return f'Hello, {name}!'\n\nresult = greeting('World')\n"
@@ -709,10 +749,10 @@ class TestTextEditorServer:
             }
             result = await overwrite_fn(new_lines=new_lines)
             assert result["status"] == "preview"
-            decide_fn = self.get_tool_fn(server, "decide")
-            decide_result = await decide_fn(decision="accept")
-            assert decide_result["status"] == "success"
-            assert "Changes applied successfully" in decide_result["message"]
+            confirm_fn = self.get_tool_fn(server, "confirm")
+            confirm_result = await confirm_fn()
+            assert confirm_result["status"] == "success"
+            assert "Changes applied successfully" in confirm_result["message"]
             with open(js_file_path, "r") as f:
                 file_content = f.read()
             expected_content = "function greeting(name) {\n  return `Hello, ${name}!`;\n}\n\nconst result = greeting('World');\n"
@@ -802,10 +842,10 @@ class TestTextEditorServer:
             }
             result = await overwrite_fn(new_lines=new_jsx_content)
             assert result["status"] == "preview"
-            decide_fn = self.get_tool_fn(server, "decide")
-            decide_result = await decide_fn(decision="accept")
-            assert decide_result["status"] == "success"
-            assert "Changes applied successfully" in decide_result["message"]
+            confirm_fn = self.get_tool_fn(server, "confirm")
+            confirm_result = await confirm_fn()
+            assert confirm_result["status"] == "success"
+            assert "Changes applied successfully" in confirm_result["message"]
             with open(jsx_file_path, "r") as f:
                 file_content = f.read()
             expected_content = "import React from 'react';\n\nfunction Greeting({ name }) {\n  return <div>Hello, {name}!</div>;\n}\n\nexport default Greeting;\n"

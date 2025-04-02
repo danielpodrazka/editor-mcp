@@ -108,7 +108,7 @@ class TextEditorServer:
     Edit workflow:
     1. Select content range with the select() tool to identify lines for editing
     2. Propose changes with overwrite() to generate a diff preview
-    3. Confirm changes with decide() to apply or cancel the pending modifications
+    3. Use confirm() to apply or cancel() to discard the pending modifications
 
     Attributes:
         mcp (FastMCP): The MCP server instance for handling tool registrations
@@ -346,7 +346,7 @@ class TextEditorServer:
 
             This is the first step in a two-step process:
             1. First call overwrite() to generate a diff preview
-            2. Then call decide() to accept or cancel the pending changes
+            2. Then call confirm() to apply or cancel() to discard the pending changes
 
             Args:
                 new_lines (dict): List of new lines to overwrite the selected range. Wrapped in "lines" key. Example:
@@ -497,7 +497,7 @@ class TextEditorServer:
 
             result = {
                 "status": "preview",
-                "message": "Changes ready to apply. Use decide('accept') to apply or decide('cancel') to discard.",
+                "message": "Changes ready to apply. Use confirm() to apply or cancel() to discard.",
                 "diff_lines": diff_result["diff_lines"],
                 "start": start,
                 "end": end,
@@ -519,36 +519,12 @@ class TextEditorServer:
             return result
 
         @self.mcp.tool()
-        async def decide(
-            decision: str,
-        ) -> Dict[str, Any]:
+        async def confirm() -> Dict[str, Any]:
             """
-            Apply or cancel pending changes from the overwrite operation.
-
-            This is the second step in the two-step process:
-            1. First call overwrite() to generate a diff preview
-            2. Then call decide() to accept or cancel the pending changes
-
-            Args:
-                decision (str): Either 'accept' to apply changes or 'cancel' to discard them
-
-            Returns:
-                dict: Operation result with status and message
+            Apply pending changes from the overwrite operation.
             """
             if self.pending_modified_lines is None or self.pending_diff is None:
                 return {"error": "No pending changes to apply. Use overwrite first."}
-
-            if decision.lower() not in ["accept", "cancel"]:
-                return {"error": "Decision must be either 'accept' or 'cancel'."}
-
-            if decision.lower() == "cancel":
-                self.pending_modified_lines = None
-                self.pending_diff = None
-
-                return {
-                    "status": "success",
-                    "message": "Changes cancelled.",
-                }
 
             try:
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
@@ -568,6 +544,22 @@ class TextEditorServer:
                 return result
             except Exception as e:
                 return {"error": f"Error writing to file: {str(e)}"}
+
+        @self.mcp.tool()
+        async def cancel() -> Dict[str, Any]:
+            """
+            Discard pending changes from the overwrite operation.
+            """
+            if self.pending_modified_lines is None or self.pending_diff is None:
+                return {"error": "No pending changes to discard. Use overwrite first."}
+
+            self.pending_modified_lines = None
+            self.pending_diff = None
+
+            return {
+                "status": "success",
+                "message": "Changes cancelled.",
+            }
 
         @self.mcp.tool()
         async def delete_file() -> Dict[str, Any]:
