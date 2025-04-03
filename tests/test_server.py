@@ -3,6 +3,7 @@ import pytest
 import tempfile
 import hashlib
 from src.text_editor.server import TextEditorServer, calculate_id, generate_diff_preview
+from mcp.server.fastmcp import FastMCP
 
 
 class TestTextEditorServer:
@@ -395,6 +396,41 @@ class TestTextEditorServer:
         assert result["status"] == "success"
         assert result["total_matches"] == 0
         assert len(result["matches"]) == 0
+
+    @pytest.mark.asyncio
+    async def test_skim_no_file_set(self, server):
+        """Test skim with no file set."""
+        skim_fn = self.get_tool_fn(server, "skim")
+        result = await skim_fn()
+        assert "error" in result
+        assert "No file path is set" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_skim_basic(self, server, temp_file):
+        """Test basic skim functionality."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+        skim_fn = self.get_tool_fn(server, "skim")
+        result = await skim_fn()
+        assert "lines" in result
+        assert "total_lines" in result
+        assert "max_select_lines" in result
+        assert result["total_lines"] == 5
+        assert result["max_select_lines"] == server.max_select_lines
+        assert len(result["lines"]) == 5
+        for i, line_data in enumerate(result["lines"], 1):
+            assert line_data[0] == i  # Check line number
+            assert line_data[1] == f"Line {i}"  # Check line content
+
+    @pytest.mark.asyncio
+    async def test_overwrite_no_selection(self, server, temp_file):
+        """Test overwrite when no selection has been made."""
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(temp_file)
+        overwrite_fn = self.get_tool_fn(server, "overwrite")
+        result = await overwrite_fn(new_lines={"lines": ["New content"]})
+        assert "error" in result
+        assert "No selection has been made" in result["error"]
 
     @pytest.mark.asyncio
     async def test_find_line_file_read_error(self, server, temp_file, monkeypatch):
@@ -1376,6 +1412,172 @@ def outer_function(param):
         finally:
             if os.path.exists(js_file_path):
                 os.unlink(js_file_path)
+
+    @pytest.mark.asyncio
+    async def test_listdir_tool(self, server, temp_file, monkeypatch):
+        """Test the listdir tool functionality."""
+        # Create a test directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create some test files in the directory
+            test_files = ["file1.txt", "file2.py", "file3.js"]
+            for file_name in test_files:
+                file_path = os.path.join(temp_dir, file_name)
+                with open(file_path, "w") as f:
+                    f.write(f"Content for {file_name}")
+
+            # Test the listdir tool
+            listdir_fn = self.get_tool_fn(server, "listdir")
+            result = await listdir_fn(dirpath=temp_dir)
+
+            # Check that the result contains the expected data
+            assert "filenames" in result
+            assert "path" in result
+            assert result["path"] == temp_dir
+
+            # Check that all test files are in the result
+            for file_name in test_files:
+                assert file_name in result["filenames"]
+
+    @pytest.mark.asyncio
+    async def test_listdir_error_not_directory(self, server, temp_file):
+        """Test the listdir tool with a path that is not a directory."""
+        # Use the temp_file fixture which is a file, not a directory
+        listdir_fn = self.get_tool_fn(server, "listdir")
+        result = await listdir_fn(dirpath=temp_file)
+
+        # Check that an appropriate error is returned
+        assert "error" in result
+        assert "not a directory" in result["error"].lower()
+        assert "path" in result
+        assert result["path"] == temp_file
+
+    @pytest.mark.asyncio
+    async def test_listdir_error_nonexistent_path(self, server):
+        """Test the listdir tool with a non-existent path."""
+        # Create a path that doesn't exist
+        nonexistent_path = "/path/that/does/not/exist"
+
+        # Test the listdir tool with the non-existent path
+        listdir_fn = self.get_tool_fn(server, "listdir")
+        result = await listdir_fn(dirpath=nonexistent_path)
+
+        # Check that an appropriate error is returned
+        assert "error" in result
+        assert "unexpected error" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_duckdb_usage_stats_enabled(self, monkeypatch):
+        """Test that usage stats are enabled when environment variable is set."""
+        # Mock environment variables to enable stats
+        monkeypatch.setenv("DUCKDB_USAGE_STATS", "1")
+        monkeypatch.setenv("STATS_DB_PATH", ":memory:")
+
+        # Create a server with usage stats enabled
+        server = TextEditorServer()
+
+        # Check that usage stats are enabled
+        assert server.usage_stats_enabled is True
+        assert server.stats_db_path == ":memory:"
+
+        # Verify the decorator wrapper was applied
+        assert server.mcp.tool != FastMCP.tool
+
+    @pytest.mark.asyncio
+    async def test_duckdb_usage_stats_disabled(self, monkeypatch):
+        """Test that usage stats are disabled by default."""
+        # Mock environment variables to explicitly disable stats
+        monkeypatch.setenv("DUCKDB_USAGE_STATS", "0")
+
+        # Create a server with usage stats disabled
+        server = TextEditorServer()
+
+        # Check that usage stats are disabled
+        assert server.usage_stats_enabled is False
+        assert not hasattr(server, "stats_db_path")
+
+    @pytest.mark.asyncio
+    async def test_find_js_function_babel(
+        self, server, javascript_test_file, monkeypatch
+    ):
+        """Test the _find_js_function_babel method for JavaScript parsing."""
+
+        # Create a mock subprocess result with Babel output
+        class MockCompletedProcess:
+            def __init__(self):
+                self.returncode = 0
+                # Mock Babel output with function location data
+                self.stdout = """FUNCTION_LOCATIONS: {
+                    "simpleFunction": {
+                        "start": {"line": 5, "column": 0},
+                        "end": {"line": 8, "column": 1}
+                    }
+                }"""
+                self.stderr = ""
+
+        # Mock subprocess.run to return our mock data
+        monkeypatch.setattr(
+            "subprocess.run", lambda *args, **kwargs: MockCompletedProcess()
+        )
+
+        # Set up the server with the test file
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(javascript_test_file)
+
+        # Call _find_js_function_babel directly
+        result = server._find_js_function_babel(
+            "simpleFunction",
+            "function simpleFunction() {}\n",
+            ["function simpleFunction() {}\n"],
+        )
+
+        # Verify the result
+        assert result is not None
+        assert "status" in result
+        assert result["status"] == "success"
+        assert "parser" in result
+        assert result["parser"] == "babel"
+        assert "start_line" in result
+        assert result["start_line"] == 5
+        assert "end_line" in result
+        assert result["end_line"] == 8
+
+    @pytest.mark.asyncio
+    async def test_find_js_function_babel_no_match(
+        self, server, javascript_test_file, monkeypatch
+    ):
+        """Test _find_js_function_babel when no matching function is found."""
+
+        # Create a mock subprocess result with Babel output for a different function
+        class MockCompletedProcess:
+            def __init__(self):
+                self.returncode = 0
+                # Mock Babel output with function location data
+                self.stdout = """FUNCTION_LOCATIONS: {
+                    "otherFunction": {
+                        "start": {"line": 10, "column": 0},
+                        "end": {"line": 12, "column": 1}
+                    }
+                }"""
+                self.stderr = ""
+
+        # Mock subprocess.run to return our mock data
+        monkeypatch.setattr(
+            "subprocess.run", lambda *args, **kwargs: MockCompletedProcess()
+        )
+
+        # Set up the server with the test file
+        set_file_fn = self.get_tool_fn(server, "set_file")
+        await set_file_fn(javascript_test_file)
+
+        # Call _find_js_function_babel for a function that doesn't exist in the mock output
+        result = server._find_js_function_babel(
+            "simpleFunction",
+            "function simpleFunction() {}\n",
+            ["function simpleFunction() {}\n"],
+        )
+
+        # Should return None when the function is not found
+        assert result is None
 
     @pytest.fixture
     def javascript_test_file(self):
