@@ -558,7 +558,7 @@ The text editor MCP can collect usage statistics when enabled, providing insight
 - **Data Collection**: Statistics are collected in a DuckDB database when `DUCKDB_USAGE_STATS` is enabled
 - **Tracked Information**: Records tool name, arguments, timestamp, current file path, tool response, and request/client IDs
 - **Storage Location**: Data is stored in a DuckDB file specified by `STATS_DB_PATH`
-- **Privacy**: Large objects and non-serializable data are summarized rather than stored in full
+- **Privacy**: Everything is stored locally on your machine
 
 The collected statistics can help understand usage patterns, identify common workflows, and optimize the editor for most frequent operations.
 
