@@ -209,11 +209,13 @@ class TextEditorServer:
             # Replace the original tool decorator with our wrapper
             # Making sure we preserve all the original functionality
             original_tool = self.mcp.tool
-            logger.info(f"Setting up logging tool decorator using {self.stats_db_path}")
+            logger.debug(
+                f"Setting up logging tool decorator using {self.stats_db_path}"
+            )
             self.mcp.tool = create_logging_tool_decorator(
                 original_tool, self._log_tool_usage
             )
-            logger.info("Logging tool decorator set up complete")
+            logger.debug("Logging tool decorator set up complete")
         self.max_select_lines = int(os.getenv("MAX_SELECT_LINES", "50"))
         self.enable_js_syntax_check = os.getenv(
             "ENABLE_JS_SYNTAX_CHECK", "1"
@@ -240,11 +242,11 @@ class TextEditorServer:
 
     def _init_stats_db(self):
         """Initialize the DuckDB database for storing tool usage statistics."""
-        logger.info(f"Initializing stats database at {self.stats_db_path}")
+        logger.debug(f"Initializing stats database at {self.stats_db_path}")
         try:
             # Connect to DuckDB and create the table if it doesn't exist
             with duckdb.connect(self.stats_db_path) as conn:
-                logger.info("Connected to DuckDB for initialization")
+                logger.debug("Connected to DuckDB for initialization")
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS tool_usage (
                         tool_name VARCHAR,
@@ -257,9 +259,9 @@ class TextEditorServer:
                     )
                 """)
                 conn.commit()
-                logger.info("Database tables initialized successfully")
+                logger.debug("Database tables initialized successfully")
         except Exception as e:
-            logger.info(f"Error initializing stats database: {str(e)}")
+            logger.debug(f"Error initializing stats database: {str(e)}")
 
     def _log_tool_usage(self, tool_name: str, args: dict, response=None):
         """
@@ -329,7 +331,7 @@ class TextEditorServer:
                     response_json = json.dumps(response)
                 except (TypeError, OverflowError):
                     # Handle edge cases where something non-serializable might have been returned
-                    logger.info(
+                    logger.debug(
                         f"Non-serializable response received from {tool_name}, converting to string representation"
                     )
                     if isinstance(response, dict):
@@ -368,9 +370,9 @@ class TextEditorServer:
                     conn.commit()
                     logger.debug(f"Insert completed successfully")
             except Exception as e:
-                logger.info(f"DuckDB error: {str(e)}")
+                logger.debug(f"DuckDB error: {str(e)}")
         except Exception as e:
-            logger.info(f"Error logging tool usage: {str(e)}")
+            logger.debug(f"Error logging tool usage: {str(e)}")
 
     def register_tools(self):
         @self.mcp.tool()
