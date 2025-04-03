@@ -9,10 +9,11 @@ A Python-based text editor server built with FastMCP that provides tools for fil
   - Read entire files with line numbers using `skim`
   - Read specific line ranges with prefixed line numbers using `read`
   - Find specific text within files using `find_line`
+  - Find and extract function definitions in Python and JavaScript/JSX files using `find_function`
 - **Edit Operations**:
   - Two-step editing process with diff preview
   - Select and overwrite text with ID verification
-  - Clean editing workflow with select → overwrite → decide pattern
+  - Clean editing workflow with select → overwrite → confirm/cancel pattern
   - Syntax checking for Python (.py) and JavaScript/React (.js, .jsx) files
   - Create new files with content
 - **File Management**:
@@ -22,6 +23,7 @@ A Python-based text editor server built with FastMCP that provides tools for fil
   - Content ID verification to prevent conflicts
   - Line count limits to prevent resource exhaustion
   - Syntax checking to maintain code integrity
+  - Protected paths to restrict access to sensitive files
 
 ## Key Advantages For LLMs
 
@@ -133,10 +135,11 @@ You can add the Editor MCP to your MCP configuration file:
      "text-editor": {
        "command": "editor-mcp",
        "env": {
-         "MAX_EDIT_LINES": "100",
+         "MAX_SELECT_LINES": "100",
          "ENABLE_JS_SYNTAX_CHECK": "0",
          "FAIL_ON_PYTHON_SYNTAX_ERROR": "1",
-         "FAIL_ON_JS_SYNTAX_ERROR": "0"
+         "FAIL_ON_JS_SYNTAX_ERROR": "0",
+         "PROTECTED_PATHS": "*.env,.env*,config*.json,*secret*,/etc/passwd,/home/user/.ssh/id_rsa"
        }
      }
   }
@@ -144,7 +147,7 @@ You can add the Editor MCP to your MCP configuration file:
 ```
 Explanation of env variables:
 
-"MAX_EDIT_LINES": "100" - The LLM won't be able to overwrite more than 100 lines at a time (default is 50)
+"MAX_SELECT_LINES": "100" - The LLM won't be able to overwrite more than 100 lines at a time (default is 50)
 
 "ENABLE_JS_SYNTAX_CHECK": "0" - When editing Javascript/React code, the changes won't be checked for syntax issues
 
@@ -161,10 +164,11 @@ Explanation of env variables:
        "command": "/home/daniel/pp/venvs/editor-mcp/bin/python",
        "args": ["/home/daniel/pp/editor-mcp/src/text_editor/server.py"],
         "env": {
-          "MAX_EDIT_LINES": "100",
+          "MAX_SELECT_LINES": "100",
           "ENABLE_JS_SYNTAX_CHECK": "0",
           "FAIL_ON_PYTHON_SYNTAX_ERROR": "1",
-          "FAIL_ON_JS_SYNTAX_ERROR": "0"
+          "FAIL_ON_JS_SYNTAX_ERROR": "0",
+          "PROTECTED_PATHS": "*.env,.env*,config*.json,*secret*,/etc/passwd,/home/user/.ssh/id_rsa"
         }
      }
   }
@@ -172,7 +176,7 @@ Explanation of env variables:
 ```
 
 ### Available Tools
-
+### Available Tools (11 total)
 #### 1. `set_file`
 Sets the current file to work with.
 
@@ -191,14 +195,14 @@ Reads full text from the current file. Each line is prefixed with its line numbe
 **Example output**:
 ```
 {
-  "lines": {
-    "1": "def hello():",
-    "2": "    print(\"Hello, world!\")",
-    "3": "",
-    "4": "hello()"
-  },
+  "lines": [
+    [1, "def hello():"],
+    [2, "    print(\"Hello, world!\")"],
+    [3, ""],
+    [4, "hello()"]
+  ],
   "total_lines": 4,
-  "max_edit_lines": 50
+  "max_select_lines": 50
 }
 ```
 
@@ -215,12 +219,12 @@ Reads text from the current file from start line to end line.
 **Example output**:
 ```
 {
-  "lines": {
-    "1": "def hello():",
-    "2": "    print(\"Hello, world!\")",
-    "3": "",
-    "4": "hello()"
-  },
+  "lines": [
+    [1, "def hello():"],
+    [2, "    print(\"Hello, world!\")"],
+    [3, ""],
+    [4, "hello()"]
+  ],
   "start_line": 1,
   "end_line": 4
 }
@@ -237,7 +241,7 @@ Select a range of lines from the current file for subsequent overwrite operation
 - Dictionary containing the selected lines, line range, and ID for verification
 
 **Note**:
-- This tool validates the selection against max_edit_lines
+- This tool validates the selection against max_select_lines
 - The selection details are stored for use in the overwrite tool
 - This must be used before calling the overwrite tool
 
@@ -253,32 +257,39 @@ Prepare to overwrite a range of lines in the current file with new text.
 **Note**:
 - This is the first step in a two-step process:
   1. First call overwrite() to generate a diff preview
-  2. Then call decide() to accept or cancel the pending changes
+  2. Then call confirm() to apply or cancel() to discard the pending changes
 - This tool allows replacing the previously selected lines with new content
 - The number of new lines can differ from the original selection
 - For Python files (.py extension), syntax checking is performed before writing
 - For JavaScript/React files (.js, .jsx extensions), syntax checking is optional and can be disabled via the `ENABLE_JS_SYNTAX_CHECK` environment variable
 
-#### 6. `decide`
-Apply or cancel pending changes from the overwrite operation.
-
-**Parameters**:
-- `decision` (str): Either 'accept' to apply changes or 'cancel' to discard them
+#### 6. `confirm`
+Apply pending changes from the overwrite operation.
 
 **Returns**:
 - Operation result with status and message
 
 **Note**:
-- This is the second step in the two-step process after using overwrite
+- This is one of the two possible actions in the second step of the editing process
 - The selection is removed upon successful application of changes
 
-#### 7. `delete_file`
+#### 7. `cancel`
+Discard pending changes from the overwrite operation.
+
+**Returns**:
+- Operation result with status and message
+
+**Note**:
+- This is one of the two possible actions in the second step of the editing process
+- The selection remains intact when changes are cancelled
+
+#### 8. `delete_file`
 Delete the currently set file.
 
 **Returns**:
 - Operation result with status and message
 
-#### 8. `new_file`
+#### 9. `new_file`
 Creates a new file.
 
 **Parameters**:
@@ -290,25 +301,21 @@ Creates a new file.
 **Note**:
 - This tool will fail if the current file exists and is not empty
 
-#### 9. `find_line`
+#### 10. `find_line`
 Find lines that match provided text in the current file.
 
 **Parameters**:
 - `search_text` (str): Text to search for in the file
 
 **Returns**:
-- Dictionary containing matching lines with their line numbers, id, and full text
+- Dictionary containing matching lines with their line numbers and total matches
 
 **Example output**:
 ```
 {
   "status": "success",
   "matches": [
-    {
-      "line_number": 2,
-      "id": "L2-a1",
-      "text": "    print(\"Hello, world!\")\n"
-    }
+    [2, "    print(\"Hello, world!\")"]
   ],
   "total_matches": 1
 }
@@ -318,10 +325,44 @@ Find lines that match provided text in the current file.
 - Returns an error if no file path is set
 - Searches for exact text matches within each line
 - The id can be used for subsequent edit operations
+
+#### 11. `find_function`
+Find a function or method definition in the current Python or JavaScript/JSX file.
+
+**Parameters**:
+- `function_name` (str): Name of the function or method to find
+
+**Returns**:
+- Dictionary containing the function lines with their line numbers, start_line, and end_line
+
+**Example output**:
+```
+{
+  "status": "success",
+  "lines": [
+    [10, "def hello():"],
+    [11, "    print(\"Hello, world!\")"],
+    [12, "    return True"]
+  ],
+  "start_line": 10,
+  "end_line": 12
+}
+```
+
+**Note**:
+- For Python files, this tool uses Python's AST and tokenize modules to accurately identify function boundaries including decorators and docstrings
+- For JavaScript/JSX files, this tool uses regex pattern matching to identify function declarations and their boundaries
+- Supports standard JavaScript functions, async functions, arrow functions, and React hooks like useCallback
+- For Python files, this tool uses Python's AST and tokenize modules to accurately identify function boundaries including decorators and docstrings
+- For JavaScript/JSX files, this tool uses a combination of approaches:
+  - Primary method: Babel AST parsing when available (requires Node.js and Babel packages)
+  - Fallback method: Regex pattern matching for function declarations when Babel is unavailable
+- Supports standard JavaScript functions, async functions, arrow functions, and React hooks like useCallback
+- Returns an error if no file path is set or if the function is not found
 ## Configuration
 
 Environment variables:
-- `MAX_EDIT_LINES`: Maximum number of lines that can be edited with hash verification (default: 50)
+- `MAX_SELECT_LINES`: Maximum number of lines that can be edited with hash verification (default: 50)
 - `ENABLE_JS_SYNTAX_CHECK`: Controls whether JavaScript/JSX syntax checking is enabled (default: 1)
   - Set to "0", "false", or "no" to disable JavaScript syntax checking
   - Useful if you don't have Babel and related dependencies installed
@@ -330,6 +371,19 @@ Environment variables:
   - The lines will remain selected so you can fix the error and try again
 - `FAIL_ON_JS_SYNTAX_ERROR`: Controls whether JavaScript/JSX syntax errors automatically cancel the overwrite operation (default: 0)
   - When enabled, syntax errors in JavaScript/JSX files will cause the overwrite action to be automatically cancelled
+  - The lines will remain selected so you can fix the error and try again
+- `DUCKDB_USAGE_STATS`: Controls whether usage statistics are collected in a DuckDB database (default: 0)
+  - Set to "1", "true", or "yes" to enable collection of tool usage statistics
+  - When enabled, records information about each tool call including timestamps and arguments
+- `STATS_DB_PATH`: Path where the DuckDB database for statistics will be stored (default: "text_editor_stats.duckdb")
+  - Only used when `DUCKDB_USAGE_STATS` is enabled
+- `PROTECTED_PATHS`: Comma-separated list of file patterns or absolute paths that will be denied access
+  - Example: `*.env,.env*,config*.json,*secret*,/etc/passwd,/home/user/credentials.txt`
+  - Supports both exact file paths and flexible glob patterns with wildcards in any position:
+    - `*.env` - matches files ending with .env, like `.env`, `dev.env`, `prod.env`
+    - `.env*` - matches files starting with .env, like `.env`, `.env.local`, `.env.production`
+    - `*secret*` - matches any file containing 'secret' in the name
+  - Provides protection against accidentally exposing sensitive configuration files and credentials
   - The lines will remain selected so you can fix the error and try again
 
 ## Development
@@ -393,7 +447,7 @@ The test suite covers:
 
 3. **select tool**
    - Line range validation
-   - Selection validation against max_edit_lines
+   - Selection validation against max_select_lines
    - Selection storage for subsequent operations
 
 4. **overwrite tool**
@@ -402,7 +456,7 @@ The test suite covers:
    - Syntax checking for Python and JavaScript/React files
    - Generation of diff preview for changes
 
-5. **decide tool**
+5. **confirm and cancel tools**
    - Applying or canceling pending changes
    - Two-step verification process
    
@@ -431,7 +485,7 @@ Unlike traditional code editing approaches where LLMs simply search for lines to
 3. **read** - The LLM examines specific sections relevant to the task, with lines shown alongside numbers for better context
 4. **select** - When ready to edit, the LLM selects specific lines (limited to a configurable number, default 50)
 5. **overwrite** - The LLM proposes replacement content, resulting in a git diff-style preview that shows exactly what will change
-6. **decide** - After reviewing the preview, the LLM can accept or cancel the changes
+6. **confirm/cancel** - After reviewing the preview, the LLM can either apply or discard the changes
 
 This structured workflow forces the LLM to reason carefully about each edit and prevents common errors like accidentally overwriting entire files. By seeing previews of changes before committing them, the LLM can verify its edits are correct.
 
@@ -446,18 +500,20 @@ The ID mechanism uses SHA-256 to generate a unique identifier of the file conten
 The main `TextEditorServer` class:
 
 1. Initializes with a FastMCP instance named "text-editor"
-2. Sets a configurable `max_edit_lines` limit (default: 50) from environment variables
+2. Sets a configurable `max_select_lines` limit (default: 50) from environment variables
 3. Maintains the current file path as state
-4. Registers nine primary tools through FastMCP:
+4. Registers eleven primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
    - `skim`: Reads the entire content of a file, returning a dictionary of line numbers to line text
    - `read`: Reads lines from specified line range, returning a structured dictionary of line content
    - `select`: Selects lines for subsequent overwrite operation
    - `overwrite`: Takes a list of new lines and prepares diff preview for changing content
-   - `decide`: Applies or cancels pending changes
+   - `confirm`: Applies pending changes from the overwrite operation
+   - `cancel`: Discards pending changes from the overwrite operation
    - `delete_file`: Deletes the current file
    - `new_file`: Creates a new file
    - `find_line`: Finds lines containing specific text
+   - `find_function`: Finds function or method definitions in Python and JavaScript/JSX files
 
 The server runs using FastMCP's stdio transport by default, making it easy to integrate with various clients.
 
@@ -494,6 +550,19 @@ This will create a file called hello_world.txt in your home directory.
 
 After this, you should be able to use the chat with this tool normally.
 ![example.png](example.png)
+
+## Usage Statistics
+
+The text editor MCP can collect usage statistics when enabled, providing insights into how the editing tools are being used:
+
+- **Data Collection**: Statistics are collected in a DuckDB database when `DUCKDB_USAGE_STATS` is enabled
+- **Tracked Information**: Records tool name, arguments, timestamp, current file path, tool response, and request/client IDs
+- **Storage Location**: Data is stored in a DuckDB file specified by `STATS_DB_PATH`
+- **Privacy**: Everything is stored locally on your machine
+
+The collected statistics can help understand usage patterns, identify common workflows, and optimize the editor for most frequent operations.
+
+You can query the database using standard SQL via any DuckDB client to analyze usage patterns.
 ## Troubleshooting
 
 If you encounter issues:
