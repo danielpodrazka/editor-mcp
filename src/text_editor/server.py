@@ -26,7 +26,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("text_editor")
-logger.info("hello from logger")
 
 
 def calculate_id(text: str, start: int = None, end: int = None) -> str:
