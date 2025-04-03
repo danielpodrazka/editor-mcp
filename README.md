@@ -530,25 +530,6 @@ This system prompt helps the AI assistant:
 
 By incorporating this system prompt when working with AI assistants, you'll get more reliable editing behavior and avoid common pitfalls in automated code editing.
 
-## Known Issues
-
-This issue should be fixed now but in case it still happens I leave the solution here:
-
-Sometimes when `overwrite` tool is used, the Claude Desktop stops working and a message about temporary disruption is displayed. I reported this to Claude. If you come across this error, you can restart Claude Desktop and try again. Try making a small change first, if it works, it's more likely the tool will continue working in the active chat.
-The message that is displayed when this happens:
-```
-Claude will return soon
-Claude.ai is currently experiencing a temporary service disruption. We’re working on it, please check back soon.
-```
-
-Here is a temporary way to walk around this issue:
-Create a new chat with the following prompt:
-```
-Create a new file in `./hello_world.txt` and replace the content with text: "hello world"
-```
-This will create a file called hello_world.txt in your home directory.
-
-After this, you should be able to use the chat with this tool normally.
 ![example.png](example.png)
 
 ## Usage Statistics
