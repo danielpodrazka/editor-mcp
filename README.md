@@ -135,7 +135,7 @@ You can add the Editor MCP to your MCP configuration file:
      "text-editor": {
        "command": "editor-mcp",
        "env": {
-         "MAX_EDIT_LINES": "100",
+         "MAX_SELECT_LINES": "100",
          "ENABLE_JS_SYNTAX_CHECK": "0",
          "FAIL_ON_PYTHON_SYNTAX_ERROR": "1",
          "FAIL_ON_JS_SYNTAX_ERROR": "0",
@@ -147,7 +147,7 @@ You can add the Editor MCP to your MCP configuration file:
 ```
 Explanation of env variables:
 
-"MAX_EDIT_LINES": "100" - The LLM won't be able to overwrite more than 100 lines at a time (default is 50)
+"MAX_SELECT_LINES": "100" - The LLM won't be able to overwrite more than 100 lines at a time (default is 50)
 
 "ENABLE_JS_SYNTAX_CHECK": "0" - When editing Javascript/React code, the changes won't be checked for syntax issues
 
@@ -164,7 +164,7 @@ Explanation of env variables:
        "command": "/home/daniel/pp/venvs/editor-mcp/bin/python",
        "args": ["/home/daniel/pp/editor-mcp/src/text_editor/server.py"],
         "env": {
-          "MAX_EDIT_LINES": "100",
+          "MAX_SELECT_LINES": "100",
           "ENABLE_JS_SYNTAX_CHECK": "0",
           "FAIL_ON_PYTHON_SYNTAX_ERROR": "1",
           "FAIL_ON_JS_SYNTAX_ERROR": "0",
@@ -202,7 +202,7 @@ Reads full text from the current file. Each line is prefixed with its line numbe
     "4": "hello()"
   },
   "total_lines": 4,
-  "max_edit_lines": 50
+  "max_select_lines": 50
 }
 ```
 
@@ -241,7 +241,7 @@ Select a range of lines from the current file for subsequent overwrite operation
 - Dictionary containing the selected lines, line range, and ID for verification
 
 **Note**:
-- This tool validates the selection against max_edit_lines
+- This tool validates the selection against max_select_lines
 - The selection details are stored for use in the overwrite tool
 - This must be used before calling the overwrite tool
 
@@ -361,7 +361,7 @@ Find a function or method definition in the current Python or JavaScript/JSX fil
 ## Configuration
 
 Environment variables:
-- `MAX_EDIT_LINES`: Maximum number of lines that can be edited with hash verification (default: 50)
+- `MAX_SELECT_LINES`: Maximum number of lines that can be edited with hash verification (default: 50)
 - `ENABLE_JS_SYNTAX_CHECK`: Controls whether JavaScript/JSX syntax checking is enabled (default: 1)
   - Set to "0", "false", or "no" to disable JavaScript syntax checking
   - Useful if you don't have Babel and related dependencies installed
@@ -441,7 +441,7 @@ The test suite covers:
 
 3. **select tool**
    - Line range validation
-   - Selection validation against max_edit_lines
+   - Selection validation against max_select_lines
    - Selection storage for subsequent operations
 
 4. **overwrite tool**
@@ -494,7 +494,7 @@ The ID mechanism uses SHA-256 to generate a unique identifier of the file conten
 The main `TextEditorServer` class:
 
 1. Initializes with a FastMCP instance named "text-editor"
-2. Sets a configurable `max_edit_lines` limit (default: 50) from environment variables
+2. Sets a configurable `max_select_lines` limit (default: 50) from environment variables
 3. Maintains the current file path as state
 4. Registers eleven primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path

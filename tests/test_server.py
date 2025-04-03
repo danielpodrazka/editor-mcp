@@ -10,7 +10,7 @@ class TestTextEditorServer:
     def server(self):
         """Create a TextEditorServer instance for testing."""
         server = TextEditorServer()
-        server.max_edit_lines = 200
+        server.max_select_lines = 200
         return server
 
     @pytest.fixture
@@ -37,7 +37,7 @@ class TestTextEditorServer:
     def server_with_protected_paths(self):
         """Create a TextEditorServer instance with protected paths configuration."""
         server = TextEditorServer()
-        server.max_edit_lines = 200
+        server.max_select_lines = 200
         # Define protected paths for testing
         server.protected_paths = ["*.env", "/etc/passwd", "/home/secret-file.txt"]
         return server
@@ -253,8 +253,8 @@ class TestTextEditorServer:
 
     @pytest.mark.asyncio
     async def test_read_large_file(self, server):
-        """Test getting text from a file larger than MAX_EDIT_LINES lines."""
-        more_than_max_lines = server.max_edit_lines + 10
+        """Test getting text from a file larger than MAX_SELECT_LINES lines."""
+        more_than_max_lines = server.max_select_lines + 10
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             for i in range(more_than_max_lines):
                 f.write(f"Line {i + 1}\n")
@@ -269,13 +269,13 @@ class TestTextEditorServer:
             result = await select_fn(1, more_than_max_lines)
             assert "error" in result
             assert (
-                f"Cannot select more than {server.max_edit_lines} lines at once"
+                f"Cannot select more than {server.max_select_lines} lines at once"
                 in result["error"]
             )
             result = await select_fn(5, 15)
             assert "status" in result
             assert "id" in result
-            result = await read_fn(5, server.max_edit_lines + 10)
+            result = await read_fn(5, server.max_select_lines + 10)
             assert "lines" in result
         finally:
             if os.path.exists(large_file_path):
@@ -470,7 +470,7 @@ class TestTextEditorServer:
         cancel_fn = self.get_tool_fn(server, "cancel")
         cancel_result = await cancel_fn()
         assert cancel_result["status"] == "success"
-        assert "Changes cancelled" in cancel_result["message"]
+        assert "Action cancelled" in cancel_result["message"]
 
         # Verify the file content is unchanged
         with open(temp_file, "r") as f:
@@ -569,10 +569,10 @@ class TestTextEditorServer:
 
     @pytest.mark.asyncio
     async def test_select_max_lines_exceeded(self, server, temp_file):
-        """Test select with a range exceeding max_edit_lines."""
+        """Test select with a range exceeding max_select_lines."""
         set_file_fn = self.get_tool_fn(server, "set_file")
         await set_file_fn(temp_file)
-        more_than_max_lines = server.max_edit_lines + 10
+        more_than_max_lines = server.max_select_lines + 10
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
             for i in range(more_than_max_lines):
                 f.write(f"Line {i + 1}\n")
@@ -580,10 +580,10 @@ class TestTextEditorServer:
         try:
             await set_file_fn(large_file_path)
             select_fn = self.get_tool_fn(server, "select")
-            result = await select_fn(start=1, end=server.max_edit_lines + 1)
+            result = await select_fn(start=1, end=server.max_select_lines + 1)
             assert "error" in result
             assert (
-                f"Cannot select more than {server.max_edit_lines} lines at once"
+                f"Cannot select more than {server.max_select_lines} lines at once"
                 in result["error"]
             )
         finally:

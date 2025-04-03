@@ -112,7 +112,7 @@ class TextEditorServer:
 
     Attributes:
         mcp (FastMCP): The MCP server instance for handling tool registrations
-        max_edit_lines (int): Maximum number of lines that can be edited with ID verification
+        max_select_lines (int): Maximum number of lines that can be edited with ID verification
         enable_js_syntax_check (bool): Whether JavaScript syntax checking is enabled
         protected_paths (list): List of file patterns and paths that are restricted from access
         current_file_path (str, optional): Path to the currently active file
@@ -125,7 +125,7 @@ class TextEditorServer:
 
     def __init__(self):
         self.mcp = FastMCP("text-editor")
-        self.max_edit_lines = int(os.getenv("MAX_EDIT_LINES", "50"))
+        self.max_select_lines = int(os.getenv("MAX_SELECT_LINES", "50"))
         self.enable_js_syntax_check = os.getenv(
             "ENABLE_JS_SYNTAX_CHECK", "1"
         ).lower() in ["1", "true", "yes"]
@@ -151,25 +151,16 @@ class TextEditorServer:
 
     def register_tools(self):
         @self.mcp.tool()
-        async def set_file(absolute_file_path: str) -> str:
+        async def set_file(filepath: str) -> str:
             """
             Set the current file to work with.
 
             This is always the first step in the workflow. You must set a file
-            before you can use other tools like read, insert, remove, etc.
-
-            Example:
-                set_file("/path/to/myfile.txt")
-
-            Args:
-                absolute_file_path (str): Absolute path to the file
-
-            Returns:
-                str: Confirmation message with the file path
+            before you can use other tools like read, select etc.
             """
 
-            if not os.path.isfile(absolute_file_path):
-                return f"Error: File not found at '{absolute_file_path}'"
+            if not os.path.isfile(filepath):
+                return f"Error: File not found at '{filepath}'"
 
             # Check if the file path matches any of the protected paths
             for pattern in self.protected_paths:
@@ -177,32 +168,29 @@ class TextEditorServer:
                 if not pattern:
                     continue
                 # Check for absolute path match
-                if absolute_file_path == pattern:
-                    return f"Error: Access to '{absolute_file_path}' is denied due to PROTECTED_PATHS configuration"
+                if filepath == pattern:
+                    return f"Error: Access to '{filepath}' is denied due to PROTECTED_PATHS configuration"
                 # Check for glob pattern match (e.g., *.env, .env*, etc.)
                 if "*" in pattern:
                     # First try matching the full path
-                    if fnmatch.fnmatch(absolute_file_path, pattern):
-                        return f"Error: Access to '{absolute_file_path}' is denied due to PROTECTED_PATHS configuration (matches pattern '{pattern}')"
+                    if fnmatch.fnmatch(filepath, pattern):
+                        return f"Error: Access to '{filepath}' is denied due to PROTECTED_PATHS configuration (matches pattern '{pattern}')"
 
                     # Then try matching just the basename
-                    basename = os.path.basename(absolute_file_path)
+                    basename = os.path.basename(filepath)
                     if fnmatch.fnmatch(basename, pattern):
-                        return f"Error: Access to '{absolute_file_path}' is denied due to PROTECTED_PATHS configuration (matches pattern '{pattern}')"
+                        return f"Error: Access to '{filepath}' is denied due to PROTECTED_PATHS configuration (matches pattern '{pattern}')"
 
-            self.current_file_path = absolute_file_path
-            return f"File set to: '{absolute_file_path}'"
+            self.current_file_path = filepath
+            return f"File set to: '{filepath}'"
 
         @self.mcp.tool()
         async def skim() -> Dict[str, Any]:
             """
-            Read full text from the current file. Each line is indexed by its line number as a dictionary.
+            Read full text from the current file.
 
             Returns:
-                dict: Dictionary containing:
-                    - lines (list): Lines with line numbers
-                    - total_lines (int): Total number of lines in the file
-                    - max_edit_lines (int): Maximum number of lines that can be edited at once
+                dict: lines, total_lines, max_select_lines
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -216,24 +204,21 @@ class TextEditorServer:
             return {
                 "lines": formatted_lines,
                 "total_lines": len(lines),
-                "max_edit_lines": self.max_edit_lines,
+                "max_select_lines": self.max_select_lines,
             }
 
         @self.mcp.tool()
         async def read(start: int, end: int) -> Dict[str, Any]:
             """
             Read lines from the current file from start line to end line, returning them in a dictionary
-            where keys are line numbers and values are the line contents.
+            like {"lines":[[1,"text on first line"],[2,"text on second line"]]}
 
             Args:
-                start (int, optional): Start line number (1-based indexing).
-                end (int, optional): End line number (1-based indexing).
+                start (int, optional): Start line number
+                end (int, optional): End line number
 
             Returns:
-                dict: Dictionary containing:
-                    - lines (list): Lines with line numbers
-                    - start_line (int): First line number in the range
-                    - end_line (int): Last line number in the range
+                dict: lines, start_line, end_line
             """
             result = {}
 
@@ -274,24 +259,14 @@ class TextEditorServer:
             end: int,
         ) -> Dict[str, Any]:
             """
-            Select a range of lines from the current file for subsequent overwrite operation.
-
-            This validates the selection against max_edit_lines and stores the selection
-            details for use in the overwrite tool.
+            Select lines from for subsequent overwrite operation.
 
             Args:
                 start (int): Start line number (1-based)
                 end (int): End line number (1-based)
 
             Returns:
-                dict: Dictionary containing:
-                    - status (str): Success status of the operation
-                    - lines (list): Selected line contents
-                    - start (int): Start line number of the selection
-                    - end (int): End line number of the selection
-                    - id (str): Unique identifier for content verification
-                    - line_count (int): Number of lines selected
-                    - message (str): Human-readable success message
+                dict: status, lines, start, end, id, line_count, message
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -309,9 +284,9 @@ class TextEditorServer:
                 if start > end:
                     return {"error": "start cannot be greater than end."}
 
-                if end - start + 1 > self.max_edit_lines:
+                if end - start + 1 > self.max_select_lines:
                     return {
-                        "error": f"Cannot select more than {self.max_edit_lines} lines at once (attempted {end - start + 1} lines)."
+                        "error": f"Cannot select more than {self.max_select_lines} lines at once (attempted {end - start + 1} lines)."
                     }
 
                 selected_lines = lines[start - 1 : end]
@@ -346,25 +321,14 @@ class TextEditorServer:
             new_lines: dict,
         ) -> Dict[str, Any]:
             """
-            Prepare to overwrite a range of lines in the current file with new text.
-
-            This is the first step in a two-step process:
-            1. First call overwrite() to generate a diff preview
-            2. Then call confirm() to apply or cancel() to discard the pending changes
+            Overwrite the selected lines with new text. Amount of new lines can differ from the original selection
 
             Args:
-                new_lines (dict): List of new lines to overwrite the selected range. Wrapped in "lines" key. Example:
-                {"lines":["line one", "second line"]}
+                new_lines (dict): Example: {"lines":["line one", "second line"]}
 
             Returns:
-                dict: Diff preview showing the proposed changes
+                dict: Diff preview showing the proposed changes, and any syntax errors for JS or Python
 
-            Notes:
-                - This tool allows replacing the previously selected lines with new content
-                - The number of new lines can differ from the original selection
-                - For Python files (.py extension), syntax checking is performed before writing
-                - For JavaScript/React files (.js, .jsx extensions), syntax checking is optional
-                  and controlled by the ENABLE_JS_SYNTAX_CHECK environment variable
             """
             new_lines = new_lines.get("lines")
             if self.current_file_path is None:
@@ -522,11 +486,10 @@ class TextEditorServer:
 
             return result
 
+        # Later on this tool should be shown conditionally, however, most clients don't support this functionality yet.
         @self.mcp.tool()
         async def confirm() -> Dict[str, Any]:
-            """
-            Apply pending changes from the overwrite operation.
-            """
+            """Confirm action"""
             if self.pending_modified_lines is None or self.pending_diff is None:
                 return {"error": "No pending changes to apply. Use overwrite first."}
 
@@ -552,7 +515,7 @@ class TextEditorServer:
         @self.mcp.tool()
         async def cancel() -> Dict[str, Any]:
             """
-            Discard pending changes from the overwrite operation.
+            Cancel action
             """
             if self.pending_modified_lines is None or self.pending_diff is None:
                 return {"error": "No pending changes to discard. Use overwrite first."}
@@ -562,16 +525,13 @@ class TextEditorServer:
 
             return {
                 "status": "success",
-                "message": "Changes cancelled.",
+                "message": "Action cancelled.",
             }
 
         @self.mcp.tool()
         async def delete_file() -> Dict[str, Any]:
             """
-            Delete the currently set file.
-
-            Returns:
-                dict: Operation result with status and message
+            Delete current file
             """
 
             if self.current_file_path is None:
@@ -595,23 +555,17 @@ class TextEditorServer:
                 return {"error": f"Error deleting file: {str(e)}"}
 
         @self.mcp.tool()
-        async def new_file(absolute_file_path: str) -> Dict[str, Any]:
+        async def new_file(filepath: str) -> Dict[str, Any]:
             """
             Creates a new file.
 
-            This tool should be used when you want to create a new file.
-            The file must not exist or be empty for this operation to succeed.
-
             Args:
-                absolute_file_path (str): Path of the new file
+                filepath (str): Path of the new file
             Returns:
-                dict: Operation result with status and id of the content if applicable
+                dict: Status message
 
-            Notes:
-                - This tool will fail if the current file exists and is not empty.
-                - Use set_file first to specify the file path.
             """
-            self.current_file_path = absolute_file_path
+            self.current_file_path = filepath
 
             if (
                 os.path.exists(self.current_file_path)
@@ -648,7 +602,7 @@ class TextEditorServer:
                 search_text (str): Text to search for in the file
 
             Returns:
-                dict: Dictionary containing matching lines with their line numbers, id, and full text
+                dict: Matching lines with their line numbers, and full text
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -660,8 +614,7 @@ class TextEditorServer:
                 matches = []
                 for i, line in enumerate(lines, start=1):
                     if search_text in line:
-                        line_id = calculate_id(line, i, i)
-                        matches.append({"line_number": i, "id": line_id, "text": line})
+                        matches.append([i, line])
 
                 result = {
                     "status": "success",
@@ -675,16 +628,16 @@ class TextEditorServer:
                 return {"error": f"Error searching file: {str(e)}"}
 
         @self.mcp.tool()
-        async def listdir(directory_path: str) -> Dict[str, Any]:
+        async def listdir(dirpath: str) -> Dict[str, Any]:
             try:
                 return {
-                    "filenames": os.listdir(directory_path),
-                    "path": directory_path,
+                    "filenames": os.listdir(dirpath),
+                    "path": dirpath,
                 }
             except NotADirectoryError as e:
                 return {
                     "error": "Specified path is not a directory.",
-                    "path": directory_path,
+                    "path": dirpath,
                 }
             except Exception as e:
                 return {
@@ -696,20 +649,13 @@ class TextEditorServer:
             function_name: str,
         ) -> Dict[str, Any]:
             """
-            Find a function or method definition in the current Python or JavaScript/JSX file.
-
-            For Python files, this tool uses Python's AST and tokenize modules to accurately identify
-            function boundaries including decorators and docstrings.
-
-            For JavaScript/JSX files, this tool uses regex pattern matching to identify function
-            declarations and their boundaries.
+            Find a function or method definition in a Python or JS/JSX file.
 
             Args:
                 function_name (str): Name of the function or method to find
 
             Returns:
-                dict: Dictionary containing the function lines with their line numbers,
-                      start_line, and end_line
+                dict: function lines with their line numbers, start_line, and end_line
             """
             if self.current_file_path is None:
                 return {"error": "No file path is set. Use set_file first."}
@@ -959,7 +905,12 @@ class TextEditorServer:
             matches = []
 
             # Check all patterns
-            for pattern in [function_pattern, arrow_pattern, method_pattern, hook_pattern]:
+            for pattern in [
+                function_pattern,
+                arrow_pattern,
+                method_pattern,
+                hook_pattern,
+            ]:
                 for match in pattern.finditer(source_code):
                     if match.groupdict().get("functionName") == function_name:
                         matches.append(match)
