@@ -176,7 +176,7 @@ Explanation of env variables:
 ```
 
 ### Available Tools
-
+### Available Tools (11 total)
 #### 1. `set_file`
 Sets the current file to work with.
 
@@ -195,12 +195,12 @@ Reads full text from the current file. Each line is prefixed with its line numbe
 **Example output**:
 ```
 {
-  "lines": {
-    "1": "def hello():",
-    "2": "    print(\"Hello, world!\")",
-    "3": "",
-    "4": "hello()"
-  },
+  "lines": [
+    [1, "def hello():"],
+    [2, "    print(\"Hello, world!\")"],
+    [3, ""],
+    [4, "hello()"]
+  ],
   "total_lines": 4,
   "max_select_lines": 50
 }
@@ -219,12 +219,12 @@ Reads text from the current file from start line to end line.
 **Example output**:
 ```
 {
-  "lines": {
-    "1": "def hello():",
-    "2": "    print(\"Hello, world!\")",
-    "3": "",
-    "4": "hello()"
-  },
+  "lines": [
+    [1, "def hello():"],
+    [2, "    print(\"Hello, world!\")"],
+    [3, ""],
+    [4, "hello()"]
+  ],
   "start_line": 1,
   "end_line": 4
 }
@@ -308,18 +308,14 @@ Find lines that match provided text in the current file.
 - `search_text` (str): Text to search for in the file
 
 **Returns**:
-- Dictionary containing matching lines with their line numbers, id, and full text
+- Dictionary containing matching lines with their line numbers and total matches
 
 **Example output**:
 ```
 {
   "status": "success",
   "matches": [
-    {
-      "line_number": 2,
-      "id": "L2-a1",
-      "text": "    print(\"Hello, world!\")\n"
-    }
+    [2, "    print(\"Hello, world!\")"]
   ],
   "total_matches": 1
 }
@@ -357,6 +353,11 @@ Find a function or method definition in the current Python or JavaScript/JSX fil
 - For Python files, this tool uses Python's AST and tokenize modules to accurately identify function boundaries including decorators and docstrings
 - For JavaScript/JSX files, this tool uses regex pattern matching to identify function declarations and their boundaries
 - Supports standard JavaScript functions, async functions, arrow functions, and React hooks like useCallback
+- For Python files, this tool uses Python's AST and tokenize modules to accurately identify function boundaries including decorators and docstrings
+- For JavaScript/JSX files, this tool uses a combination of approaches:
+  - Primary method: Babel AST parsing when available (requires Node.js and Babel packages)
+  - Fallback method: Regex pattern matching for function declarations when Babel is unavailable
+- Supports standard JavaScript functions, async functions, arrow functions, and React hooks like useCallback
 - Returns an error if no file path is set or if the function is not found
 ## Configuration
 
@@ -371,6 +372,11 @@ Environment variables:
 - `FAIL_ON_JS_SYNTAX_ERROR`: Controls whether JavaScript/JSX syntax errors automatically cancel the overwrite operation (default: 0)
   - When enabled, syntax errors in JavaScript/JSX files will cause the overwrite action to be automatically cancelled
   - The lines will remain selected so you can fix the error and try again
+- `DUCKDB_USAGE_STATS`: Controls whether usage statistics are collected in a DuckDB database (default: 0)
+  - Set to "1", "true", or "yes" to enable collection of tool usage statistics
+  - When enabled, records information about each tool call including timestamps and arguments
+- `STATS_DB_PATH`: Path where the DuckDB database for statistics will be stored (default: "text_editor_stats.duckdb")
+  - Only used when `DUCKDB_USAGE_STATS` is enabled
 - `PROTECTED_PATHS`: Comma-separated list of file patterns or absolute paths that will be denied access
   - Example: `*.env,.env*,config*.json,*secret*,/etc/passwd,/home/user/credentials.txt`
   - Supports both exact file paths and flexible glob patterns with wildcards in any position:
@@ -544,6 +550,19 @@ This will create a file called hello_world.txt in your home directory.
 
 After this, you should be able to use the chat with this tool normally.
 ![example.png](example.png)
+
+## Usage Statistics
+
+The text editor MCP can collect usage statistics when enabled, providing insights into how the editing tools are being used:
+
+- **Data Collection**: Statistics are collected in a DuckDB database when `DUCKDB_USAGE_STATS` is enabled
+- **Tracked Information**: Records tool name, arguments, timestamp, current file path, tool response, and request/client IDs
+- **Storage Location**: Data is stored in a DuckDB file specified by `STATS_DB_PATH`
+- **Privacy**: Large objects and non-serializable data are summarized rather than stored in full
+
+The collected statistics can help understand usage patterns, identify common workflows, and optimize the editor for most frequent operations.
+
+You can query the database using standard SQL via any DuckDB client to analyze usage patterns.
 ## Troubleshooting
 
 If you encounter issues:

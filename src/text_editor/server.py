@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import re
 import subprocess
@@ -7,10 +8,25 @@ import ast
 import tokenize
 import fnmatch
 import io
+import datetime
+import json
+import inspect
+import functools
 from typing import Optional, Dict, Any, Union, Literal
 import black
 from black.report import NothingChanged
 from mcp.server.fastmcp import FastMCP
+import duckdb
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+logger = logging.getLogger("text_editor")
+logger.info("hello from logger")
 
 
 def calculate_id(text: str, start: int = None, end: int = None) -> str:
@@ -85,6 +101,61 @@ def generate_diff_preview(
     }
 
 
+def create_logging_tool_decorator(original_decorator, log_callback):
+    """
+    Create a wrapper around the FastMCP tool decorator that logs tool usage.
+
+    Args:
+        original_decorator: The original FastMCP tool decorator
+        log_callback: A callback function that will be called with (tool_name, args_dict, response)
+
+    Returns:
+        A wrapped decorator function that logs tool usage
+    """
+
+    def tool_decorator_with_logging(*args, **kwargs):
+        # Get the original decorator with args
+        wrapped_decorator = original_decorator(*args, **kwargs)
+
+        def wrapper(func):
+            # Create our logging wrapper
+            @functools.wraps(func)  # Preserve func's metadata
+            async def logged_func(*func_args, **func_kwargs):
+                tool_name = func.__name__
+                # Convert args to dict for logging
+                args_dict = {}
+                if func_args and len(func_args) > 0:
+                    # Get parameter names from function signature
+                    sig = inspect.signature(func)
+                    param_names = list(sig.parameters.keys())
+                    # Skip self parameter if it exists
+                    if param_names and param_names[0] == "self":
+                        param_names = param_names[1:]
+                    for i, arg in enumerate(func_args):
+                        if i < len(param_names):
+                            args_dict[param_names[i]] = (
+                                str(arg) if isinstance(arg, (bytes, bytearray)) else arg
+                            )
+                args_dict.update(func_kwargs)
+
+                # Call the original function
+                response = await func(*func_args, **func_kwargs)
+
+                # Log the tool usage with the response
+                log_callback(tool_name, args_dict, response)
+
+                # Return the response
+                return response
+
+            # Apply the original decorator to our logged function
+            wrapped_func = wrapped_decorator(logged_func)
+            return wrapped_func
+
+        return wrapper
+
+    return tool_decorator_with_logging
+
+
 class TextEditorServer:
     """
     A server implementation for a text editor application using FastMCP.
@@ -124,7 +195,26 @@ class TextEditorServer:
     """
 
     def __init__(self):
+        # Initialize MCP server
         self.mcp = FastMCP("text-editor")
+
+        # Initialize DuckDB for usage statistics if enabled
+        self.usage_stats_enabled = os.getenv("DUCKDB_USAGE_STATS", "0").lower() in [
+            "1",
+            "true",
+            "yes",
+        ]
+        if self.usage_stats_enabled:
+            self.stats_db_path = os.getenv("STATS_DB_PATH", "text_editor_stats.duckdb")
+            self._init_stats_db()
+            # Replace the original tool decorator with our wrapper
+            # Making sure we preserve all the original functionality
+            original_tool = self.mcp.tool
+            logger.info(f"Setting up logging tool decorator using {self.stats_db_path}")
+            self.mcp.tool = create_logging_tool_decorator(
+                original_tool, self._log_tool_usage
+            )
+            logger.info("Logging tool decorator set up complete")
         self.max_select_lines = int(os.getenv("MAX_SELECT_LINES", "50"))
         self.enable_js_syntax_check = os.getenv(
             "ENABLE_JS_SYNTAX_CHECK", "1"
@@ -148,6 +238,140 @@ class TextEditorServer:
         self.pending_diff = None
 
         self.register_tools()
+
+    def _init_stats_db(self):
+        """Initialize the DuckDB database for storing tool usage statistics."""
+        logger.info(f"Initializing stats database at {self.stats_db_path}")
+        try:
+            # Connect to DuckDB and create the table if it doesn't exist
+            with duckdb.connect(self.stats_db_path) as conn:
+                logger.info("Connected to DuckDB for initialization")
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS tool_usage (
+                        tool_name VARCHAR,
+                        args JSON,
+                        response JSON,
+                        timestamp TIMESTAMP,
+                        current_file VARCHAR,
+                        request_id VARCHAR,
+                        client_id VARCHAR
+                    )
+                """)
+                conn.commit()
+                logger.info("Database tables initialized successfully")
+        except Exception as e:
+            logger.info(f"Error initializing stats database: {str(e)}")
+
+    def _log_tool_usage(self, tool_name: str, args: dict, response=None):
+        """
+        Log tool usage to the DuckDB database if stats are enabled.
+        This function is called by the decorator wrapper for each tool invocation.
+
+        Args:
+            tool_name (str): Name of the tool being used
+            args (dict): Arguments passed to the tool
+            response (dict, optional): Response returned by the tool
+        """
+        # Skip if stats are disabled
+        if not hasattr(self, "usage_stats_enabled") or not self.usage_stats_enabled:
+            return
+
+        # Print debug information to see if this function is being called
+        print(f"Logging tool usage: {tool_name}", flush=True)
+        client_id = None
+        try:
+            # Get request ID if available
+            request_id = None
+            if hasattr(self.mcp, "_mcp_server") and hasattr(
+                self.mcp._mcp_server, "request_context"
+            ):
+                request_id = getattr(
+                    self.mcp._mcp_server.request_context, "request_id", None
+                )
+
+                if hasattr(self.mcp, "_mcp_server") and hasattr(
+                    self.mcp._mcp_server, "request_context"
+                ):
+                    # Access client_id from meta if available
+                    if (
+                        hasattr(self.mcp._mcp_server.request_context, "meta")
+                        and self.mcp._mcp_server.request_context.meta
+                    ):
+                        client_id = getattr(
+                            self.mcp._mcp_server.request_context.meta, "client_id", None
+                        )
+
+            # Safely convert args to serializable format
+            safe_args = {}
+            for key, value in args.items():
+                # Skip large objects and convert non-serializable objects to strings
+                if (
+                    hasattr(value, "__len__")
+                    and not isinstance(value, (str, dict, list, tuple))
+                    and len(value) > 1000
+                ):
+                    safe_args[key] = f"<{type(value).__name__} of length {len(value)}>"
+                else:
+                    try:
+                        # Test if value is JSON serializable
+                        json.dumps({key: value})
+                        safe_args[key] = value
+                    except (TypeError, OverflowError):
+                        # If not serializable, convert to string representation
+                        safe_args[key] = f"<{type(value).__name__}>"
+
+            # Format arguments as JSON
+            args_json = json.dumps(safe_args)
+
+            # Process response - since we're using JSON RPC, responses should already be serializable
+            response_json = None
+            if response is not None:
+                try:
+                    response_json = json.dumps(response)
+                except (TypeError, OverflowError):
+                    # Handle edge cases where something non-serializable might have been returned
+                    logger.info(
+                        f"Non-serializable response received from {tool_name}, converting to string representation"
+                    )
+                    if isinstance(response, dict):
+                        # For dictionaries, process each value separately
+                        safe_response = {}
+                        for key, value in response.items():
+                            try:
+                                json.dumps({key: value})
+                                safe_response[key] = value
+                            except (TypeError, OverflowError):
+                                safe_response[key] = f"<{type(value).__name__}>"
+                        response_json = json.dumps(safe_response)
+                    else:
+                        # For non-dict types, store a basic representation
+                        response_json = json.dumps({"result": str(response)})
+
+            logger.debug(f"Attempting to connect to DuckDB at {self.stats_db_path}")
+            try:
+                with duckdb.connect(self.stats_db_path) as conn:
+                    logger.debug(f"Connected to DuckDB successfully")
+                    conn.execute(
+                        """
+                        INSERT INTO tool_usage (tool_name, args, response, timestamp, current_file, request_id, client_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                        (
+                            tool_name,
+                            args_json,
+                            response_json,
+                            datetime.datetime.now(),
+                            self.current_file_path,
+                            request_id,
+                            client_id,
+                        ),
+                    )
+                    conn.commit()
+                    logger.debug(f"Insert completed successfully")
+            except Exception as e:
+                logger.info(f"DuckDB error: {str(e)}")
+        except Exception as e:
+            logger.info(f"Error logging tool usage: {str(e)}")
 
     def register_tools(self):
         @self.mcp.tool()
