@@ -364,11 +364,12 @@ class TestTextEditorServer:
         assert "total_matches" in result
         assert result["total_matches"] == 5
         for match in result["matches"]:
-            assert "line_number" in match
-            assert "id" in match
-            assert "text" in match
-            assert f"Line {match['line_number']}" in match["text"]
-        line_numbers = [match["line_number"] for match in result["matches"]]
+            # Each match is a list with [line_number, line_text]
+            assert len(match) == 2
+            assert isinstance(match[0], int)  # line number
+            assert isinstance(match[1], str)  # line text
+            assert f"Line {match[0]}" in match[1]
+        line_numbers = [match[0] for match in result["matches"]]
         assert line_numbers == [1, 2, 3, 4, 5]
 
     @pytest.mark.asyncio
@@ -381,8 +382,8 @@ class TestTextEditorServer:
         assert result["status"] == "success"
         assert result["total_matches"] == 1
         assert len(result["matches"]) == 1
-        assert result["matches"][0]["line_number"] == 3
-        assert "Line 3" in result["matches"][0]["text"]
+        assert result["matches"][0][0] == 3  # First element is the line number
+        assert "Line 3" in result["matches"][0][1]  # Second element is the line text
 
     @pytest.mark.asyncio
     async def test_find_line_no_matches(self, server, temp_file):
