@@ -649,7 +649,7 @@ class TextEditorServer:
             function_name: str,
         ) -> Dict[str, Any]:
             """
-            Find a function or method definition in a Python or JS/JSX file.
+            Find a function or method definition in a Python or JS/JSX file. Uses AST parsers.
 
             Args:
                 function_name (str): Name of the function or method to find
@@ -674,7 +674,7 @@ class TextEditorServer:
                     source_code = file.read()
                     lines = source_code.splitlines(True)  # Keep line endings
 
-                # Process JavaScript/JSX files using regex
+                # Process JavaScript/JSX files
                 if is_javascript:
                     return self._find_js_function(function_name, source_code, lines)
 
@@ -858,7 +858,7 @@ class TextEditorServer:
         self, function_name: str, source_code: str, lines: list
     ) -> Dict[str, Any]:
         """
-        Helper method to find JavaScript/JSX function definitions using regex.
+        Helper method to find JavaScript/JSX function definitions using Babel AST parsing.
 
         Args:
             function_name (str): Name of the function to find
@@ -869,6 +869,15 @@ class TextEditorServer:
             dict: Dictionary with function information
         """
         try:
+            # First try using Babel for accurate parsing if it's available
+            if self.enable_js_syntax_check:
+                babel_result = self._find_js_function_babel(
+                    function_name, source_code, lines
+                )
+                if babel_result and not babel_result.get("error"):
+                    return babel_result
+
+            # Fallback to regex approach if Babel parsing fails or is disabled
             # Pattern for named function declaration
             # Matches: function functionName(args) { body }
             # Also matches: async function functionName(args) { body }
@@ -997,6 +1006,113 @@ class TextEditorServer:
 
         except Exception as e:
             return {"error": f"Error finding JavaScript function: {str(e)}"}
+
+    def _find_js_function_babel(
+        self, function_name: str, source_code: str, lines: list
+    ) -> Dict[str, Any]:
+        """
+        Use Babel to parse JavaScript/JSX code and find function definitions.
+
+        This provides more accurate function location by using proper AST parsing
+        rather than regex pattern matching.
+
+        Args:
+            function_name (str): Name of the function to find
+            source_code (str): Source code content
+            lines (list): Source code split by lines with line endings preserved
+
+        Returns:
+            dict: Dictionary with function information or None if Babel fails
+        """
+        try:
+            # Create a temporary file with the source code
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".jsx", delete=False
+            ) as temp:
+                temp_path = temp.name
+                temp.write(source_code)
+
+            # Determine the appropriate Babel preset
+            is_jsx = self.current_file_path.endswith(".jsx")
+            presets = ["@babel/preset-react"] if is_jsx else ["@babel/preset-env"]
+
+            # Use Babel to output the AST as JSON
+            cmd = [
+                "npx",
+                "babel",
+                "--presets",
+                ",".join(presets),
+                "--plugins",
+                # Add the AST plugin that outputs function locations
+                "babel-plugin-ast-function-metadata",
+                "--no-babelrc",
+                temp_path,
+                "--out-file",
+                "/dev/null",  # Output to nowhere, we just want the AST metadata
+            ]
+
+            # Execute Babel to get the AST with function locations
+            process = subprocess.run(cmd, capture_output=True, text=True)
+
+            # Clean up the temporary file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+
+            # If Babel execution failed, return None to fall back to regex
+            if process.returncode != 0:
+                return None
+
+            # Parse the output to find location data
+            output = process.stdout
+            # Look for the JSON that has our function location data
+            location_data = None
+            import json
+
+            try:
+                # Extract the JSON output from Babel plugin
+                # Format is typically like: FUNCTION_LOCATIONS: {... json data ...}
+                match = re.search(r"FUNCTION_LOCATIONS:\s*({.*})", output, re.DOTALL)
+                if match:
+                    json_str = match.group(1)
+                    locations = json.loads(json_str)
+                    # Find our specific function
+                    location_data = locations.get(function_name)
+            except (json.JSONDecodeError, AttributeError) as e:
+                return None
+
+            if not location_data:
+                return None
+
+            # Get the line information from the location data
+            start_line = location_data.get("start", {}).get("line", 0)
+            end_line = location_data.get("end", {}).get("line", 0)
+
+            if start_line <= 0 or end_line <= 0:
+                return None
+
+            # Extract the function lines
+            function_lines = lines[start_line - 1 : end_line]
+
+            # Format results like the read tool
+            formatted_lines = []
+            for i, line in enumerate(function_lines, start_line):
+                formatted_lines.append((i, line.rstrip()))
+
+            result = {
+                "status": "success",
+                "lines": formatted_lines,
+                "start_line": start_line,
+                "end_line": end_line,
+                "parser": "babel",  # Flag that this was parsed with Babel
+            }
+
+            return result
+
+        except Exception as e:
+            # If anything goes wrong, return None to fall back to regex approach
+            return None
 
     def run(self):
         """Run the MCP server."""
