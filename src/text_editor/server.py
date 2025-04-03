@@ -210,12 +210,14 @@ class TextEditorServer:
             # Making sure we preserve all the original functionality
             original_tool = self.mcp.tool
             logger.debug(
-                f"Setting up logging tool decorator using {self.stats_db_path}"
+                {
+                    "message": f"Setting up logging tool decorator using {self.stats_db_path}"
+                }
             )
             self.mcp.tool = create_logging_tool_decorator(
                 original_tool, self._log_tool_usage
             )
-            logger.debug("Logging tool decorator set up complete")
+            logger.debug({"msg": "Logging tool decorator set up complete"})
         self.max_select_lines = int(os.getenv("MAX_SELECT_LINES", "50"))
         self.enable_js_syntax_check = os.getenv(
             "ENABLE_JS_SYNTAX_CHECK", "1"
@@ -242,11 +244,11 @@ class TextEditorServer:
 
     def _init_stats_db(self):
         """Initialize the DuckDB database for storing tool usage statistics."""
-        logger.debug(f"Initializing stats database at {self.stats_db_path}")
+        logger.debug({"msg": f"Initializing stats database at {self.stats_db_path}"})
         try:
             # Connect to DuckDB and create the table if it doesn't exist
             with duckdb.connect(self.stats_db_path) as conn:
-                logger.debug("Connected to DuckDB for initialization")
+                logger.debug({"msg": "Connected to DuckDB for initialization"})
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS tool_usage (
                         tool_name VARCHAR,
@@ -259,9 +261,9 @@ class TextEditorServer:
                     )
                 """)
                 conn.commit()
-                logger.debug("Database tables initialized successfully")
+                logger.debug({"msg": "Database tables initialized successfully"})
         except Exception as e:
-            logger.debug(f"Error initializing stats database: {str(e)}")
+            logger.debug({"msg": f"Error initializing stats database: {str(e)}"})
 
     def _log_tool_usage(self, tool_name: str, args: dict, response=None):
         """
@@ -277,8 +279,7 @@ class TextEditorServer:
         if not hasattr(self, "usage_stats_enabled") or not self.usage_stats_enabled:
             return
 
-        # Print debug information to see if this function is being called
-        print(f"Logging tool usage: {tool_name}", flush=True)
+        logger.debug({"message": f"Logging tool usage: {tool_name}"})
         client_id = None
         try:
             # Get request ID if available
@@ -332,7 +333,9 @@ class TextEditorServer:
                 except (TypeError, OverflowError):
                     # Handle edge cases where something non-serializable might have been returned
                     logger.debug(
-                        f"Non-serializable response received from {tool_name}, converting to string representation"
+                        {
+                            "message": f"Non-serializable response received from {tool_name}, converting to string representation"
+                        }
                     )
                     if isinstance(response, dict):
                         # For dictionaries, process each value separately
@@ -348,10 +351,12 @@ class TextEditorServer:
                         # For non-dict types, store a basic representation
                         response_json = json.dumps({"result": str(response)})
 
-            logger.debug(f"Attempting to connect to DuckDB at {self.stats_db_path}")
+            logger.debug(
+                {"msg": f"Attempting to connect to DuckDB at {self.stats_db_path}"}
+            )
             try:
                 with duckdb.connect(self.stats_db_path) as conn:
-                    logger.debug(f"Connected to DuckDB successfully")
+                    logger.debug({"msg": f"Connected to DuckDB successfully"})
                     conn.execute(
                         """
                         INSERT INTO tool_usage (tool_name, args, response, timestamp, current_file, request_id, client_id)
@@ -368,11 +373,11 @@ class TextEditorServer:
                         ),
                     )
                     conn.commit()
-                    logger.debug(f"Insert completed successfully")
+                    logger.debug({"msg": f"Insert completed successfully"})
             except Exception as e:
-                logger.debug(f"DuckDB error: {str(e)}")
+                logger.debug({"msg": f"DuckDB error: {str(e)}"})
         except Exception as e:
-            logger.debug(f"Error logging tool usage: {str(e)}")
+            logger.debug({"msg": f"Error logging tool usage: {str(e)}"})
 
     def register_tools(self):
         @self.mcp.tool()
