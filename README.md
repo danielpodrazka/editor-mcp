@@ -1,6 +1,6 @@
 # Editor MCP
 
-A Python-based text editor server built with FastMCP that provides tools for file operations. This server enables reading, editing, and managing text files through a standardized API with a unique multi-step approach that significantly improves code editing accuracy and reliability for LLMs.
+A Python-based text editor server built with FastMCP that provides powerful tools for file operations. This server enables reading, editing, and managing text files through a standardized API with a unique multi-step approach that significantly improves code editing accuracy and reliability for LLMs and AI assistants.
 
 ## Features
 
@@ -19,6 +19,10 @@ A Python-based text editor server built with FastMCP that provides tools for fil
 - **File Management**:
   - Create new files with proper initialization
   - Delete files from the filesystem
+  - List directory contents with `listdir`
+- **Testing Support**:
+  - Run Python tests with `run_tests`
+  - Set Python paths for proper module resolution
 - **Safety Features**:
   - Content ID verification to prevent conflicts
   - Line count limits to prevent resource exhaustion
@@ -44,16 +48,13 @@ This text editor's unique design solves critical problems that typically affect 
 The editor implements several safeguards to ensure system stability and prevent resource exhaustion:
 
 - **Maximum Edit Lines**: By default, the editor enforces a 50-line limit for any single edit operation
-- **Two-Step Editing Process**: Changes are previewed before being applied to prevent unintended modifications
-- **Syntax Validation**: Code changes undergo syntax checking before being committed, preventing corruption
-- **ID Verification**: Each edit operation verifies the content hasn't changed since it was last read
-
 ## Installation
 
 This MCP was developed and tested with Claude Desktop. You can download Claude Desktop on any platform.
-For Claude Desktop on Linux,you can use an unofficial installation script (uses official file though), I recommend this repository:
+For Claude Desktop on Linux, you can use an unofficial installation script (uses the official file), recommended repository:
 https://github.com/emsi/claude-desktop/tree/main
-Once you have Claude Desktop you need to follow instruction below to install this specific MCP.
+
+Once you have Claude Desktop installed, follow the instructions below to install this specific MCP:
 
 ### Easy Installation with UVX (Recommended)
 
@@ -80,22 +81,22 @@ This script will:
 
 ```bash
 # Install directly from GitHub
-uvx install git+https://github.com/danielpodrazka/editor-mcp.git
+uvx install git+https://github.com/danielpodrazka/mcp-text-editor.git
 
 # Or install from a local clone
-git clone https://github.com/danielpodrazka/editor-mcp.git
-cd editor-mcp
+git clone https://github.com/danielpodrazka/mcp-text-editor.git
+cd mcp-text-editor
 uvx install -e .
 ```
 
 #### Using Traditional pip
 
 ```bash
-pip install git+https://github.com/danielpodrazka/editor-mcp.git
+pip install git+https://github.com/danielpodrazka/mcp-text-editor.git
 
 # Or from a local clone
-git clone https://github.com/danielpodrazka/editor-mcp.git
-cd editor-mcp
+git clone https://github.com/danielpodrazka/mcp-text-editor.git
+cd mcp-text-editor
 pip install -e .
 ```
 
@@ -145,17 +146,22 @@ You can add the Editor MCP to your MCP configuration file:
   }
 }
 ```
-Explanation of env variables:
 
-"MAX_SELECT_LINES": "100" - The LLM won't be able to overwrite more than 100 lines at a time (default is 50)
+### Environment Variable Configuration
 
-"ENABLE_JS_SYNTAX_CHECK": "0" - When editing Javascript/React code, the changes won't be checked for syntax issues
+The Editor MCP supports several environment variables to customize its behavior:
 
-"FAIL_ON_PYTHON_SYNTAX_ERROR": "1" - When editing Python code, syntax errors will automatically cancel the overwrite action (default is enabled)
+- **MAX_SELECT_LINES**: "100" - Maximum number of lines that can be edited in a single operation (default is 50)
 
-"FAIL_ON_JS_SYNTAX_ERROR": "0" - When editing Javascript/React code, syntax errors will NOT automatically cancel the overwrite action (default is disabled)
+- **ENABLE_JS_SYNTAX_CHECK**: "0" - Enable/disable JavaScript and JSX syntax checking (default is "1" - enabled)
 
-### Sample MCP config entry when building from source
+- **FAIL_ON_PYTHON_SYNTAX_ERROR**: "1" - When enabled, Python syntax errors will automatically cancel the overwrite operation (default is enabled)
+
+- **FAIL_ON_JS_SYNTAX_ERROR**: "0" - When enabled, JavaScript/JSX syntax errors will automatically cancel the overwrite operation (default is disabled)
+
+- **PROTECTED_PATHS**: Comma-separated list of file patterns or paths that cannot be accessed, supporting wildcards (e.g., "*.env,.env*,/etc/passwd")
+
+### Sample MCP Config When Building From Source
 
 ```json
 {
@@ -175,13 +181,14 @@ Explanation of env variables:
 }
 ```
 
-### Available Tools
-### Available Tools (11 total)
+## Available Tools
+The Editor MCP provides 13 powerful tools for file manipulation, editing, and testing:
+
 #### 1. `set_file`
 Sets the current file to work with.
 
 **Parameters**:
-- `absolute_file_path` (str): Absolute path to the file
+- `filepath` (str): Absolute path to the file
 
 **Returns**:
 - Confirmation message with the file path
@@ -190,7 +197,7 @@ Sets the current file to work with.
 Reads full text from the current file. Each line is prefixed with its line number.
 
 **Returns**:
-- Dictionary containing lines with their line numbers as keys, total number of lines, and the max edit lines setting
+- Dictionary containing lines with their line numbers, total number of lines, and the max edit lines setting
 
 **Example output**:
 ```
@@ -351,19 +358,23 @@ Find a function or method definition in the current Python or JavaScript/JSX fil
 
 **Note**:
 - For Python files, this tool uses Python's AST and tokenize modules to accurately identify function boundaries including decorators and docstrings
-- For JavaScript/JSX files, this tool uses regex pattern matching to identify function declarations and their boundaries
-- Supports standard JavaScript functions, async functions, arrow functions, and React hooks like useCallback
-- For Python files, this tool uses Python's AST and tokenize modules to accurately identify function boundaries including decorators and docstrings
 - For JavaScript/JSX files, this tool uses a combination of approaches:
   - Primary method: Babel AST parsing when available (requires Node.js and Babel packages)
   - Fallback method: Regex pattern matching for function declarations when Babel is unavailable
-- Supports standard JavaScript functions, async functions, arrow functions, and React hooks like useCallback
+- Supports various JavaScript function types including standard functions, async functions, arrow functions, and React hooks
 - Returns an error if no file path is set or if the function is not found
-## Configuration
 
-Environment variables:
-- `MAX_SELECT_LINES`: Maximum number of lines that can be edited with hash verification (default: 50)
-- `ENABLE_JS_SYNTAX_CHECK`: Controls whether JavaScript/JSX syntax checking is enabled (default: 1)
+#### 12. `listdir`
+Lists the contents of a directory.
+
+**Parameters**:
+- `dirpath` (str): Path to the directory to list
+
+**Returns**:
+- Dictionary containing list of filenames and the path queried
+
+#### 13. `run_tests` and `set_python_path`
+Tools for running Python tests with pytest and configuring the Python environment.
   - Set to "0", "false", or "no" to disable JavaScript syntax checking
   - Useful if you don't have Babel and related dependencies installed
 - `FAIL_ON_PYTHON_SYNTAX_ERROR`: Controls whether Python syntax errors automatically cancel the overwrite operation (default: 1)
@@ -502,7 +513,7 @@ The main `TextEditorServer` class:
 1. Initializes with a FastMCP instance named "text-editor"
 2. Sets a configurable `max_select_lines` limit (default: 50) from environment variables
 3. Maintains the current file path as state
-4. Registers eleven primary tools through FastMCP:
+4. Registers thirteen primary tools through FastMCP:
    - `set_file`: Validates and sets the current file path
    - `skim`: Reads the entire content of a file, returning a dictionary of line numbers to line text
    - `read`: Reads lines from specified line range, returning a structured dictionary of line content
@@ -514,6 +525,8 @@ The main `TextEditorServer` class:
    - `new_file`: Creates a new file
    - `find_line`: Finds lines containing specific text
    - `find_function`: Finds function or method definitions in Python and JavaScript/JSX files
+   - `listdir`: Lists contents of a directory
+   - `run_tests` and `set_python_path`: Tools for running Python tests
 
 The server runs using FastMCP's stdio transport by default, making it easy to integrate with various clients.
 
