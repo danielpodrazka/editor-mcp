@@ -29,6 +29,21 @@ A Python-based text editor server built with FastMCP that provides powerful tool
   - Syntax checking to maintain code integrity
   - Protected paths to restrict access to sensitive files
 
+## Security Risks
+
+The editor-mcp includes powerful capabilities that come with certain security considerations:
+
+- **Jailbreak Risk**: The editor-mcp can potentially be jailbroken when reading a file that has harmful instructions embedded inside. Malicious content in files being edited could contain instructions that manipulate the AI assistant.
+- **Arbitrary Code Execution**: If running tests is enabled, there is a risk of arbitrary code execution through manipulated test files or malicious Python code.
+- **Data Exposure**: Access to file system operations could potentially expose sensitive information if proper path protections aren't configured.
+
+To mitigate these risks:
+
+1. Use the `PROTECTED_PATHS` environment variable to restrict access to sensitive files and directories.
+2. Disable test running capabilities in production environments unless absolutely necessary.
+3. Carefully review files before opening them, especially if they come from untrusted sources.
+4. Consider running the editor in a sandboxed environment with limited permissions.
+
 ## Key Advantages For LLMs
 
 This text editor's unique design solves critical problems that typically affect LLM code editing:
