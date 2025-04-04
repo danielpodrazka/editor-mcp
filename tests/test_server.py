@@ -2,6 +2,8 @@ import os
 import pytest
 import tempfile
 import hashlib
+
+
 from src.text_editor.server import TextEditorServer, calculate_id, generate_diff_preview
 from mcp.server.fastmcp import FastMCP
 
@@ -1693,3 +1695,241 @@ export default SimpleComponent;
         yield temp_path
         if os.path.exists(temp_path):
             os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_run_tests_basic(self, server, monkeypatch):
+        """Test the basic functionality of run_tests."""
+
+        # Mock subprocess.run to simulate pytest execution
+        def mock_subprocess_run(*args, **kwargs):
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stdout = "===== 5 passed in 0.12s ====="
+                    self.stderr = ""
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+        monkeypatch.setattr("datetime.datetime", MockDateTime)
+
+        # Run the test function
+        run_tests_fn = self.get_tool_fn(server, "run_tests")
+        result = await run_tests_fn()
+        print("Result:", result)
+
+        # Verify the result
+        assert result["status"] == "success"
+        assert result["returncode"] == 0
+        assert "5 passed" in result["stdout"]
+        assert result["duration"] == 0.5  # From our mock
+        assert "python -m pytest" in result["command"]
+
+    @pytest.mark.asyncio
+    async def test_run_tests_with_path(self, server, monkeypatch):
+        """Test run_tests with a specific test path."""
+        expected_cmd = ""
+
+        def mock_subprocess_run(*args, **kwargs):
+            nonlocal expected_cmd
+            expected_cmd = " ".join(args[0])
+
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stdout = "===== 3 passed in 0.05s ====="
+                    self.stderr = ""
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+        monkeypatch.setattr("datetime.datetime", MockDateTime)
+
+        test_path = "tests/test_module.py"
+        run_tests_fn = self.get_tool_fn(server, "run_tests")
+        result = await run_tests_fn(test_path=test_path)
+
+        assert result["status"] == "success"
+        assert result["returncode"] == 0
+        assert test_path in expected_cmd
+        assert "3 passed" in result["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_run_tests_with_test_name(self, server, monkeypatch):
+        """Test run_tests with a specific test name."""
+        expected_cmd = ""
+
+        def mock_subprocess_run(*args, **kwargs):
+            nonlocal expected_cmd
+            expected_cmd = " ".join(args[0])
+
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stdout = "===== 1 passed in 0.01s ====="
+                    self.stderr = ""
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+        monkeypatch.setattr("datetime.datetime", MockDateTime)
+
+        test_name = "test_specific_function"
+        run_tests_fn = self.get_tool_fn(server, "run_tests")
+        result = await run_tests_fn(test_name=test_name)
+
+        assert result["status"] == "success"
+        assert result["returncode"] == 0
+        assert f"-k {test_name}" in expected_cmd
+        assert "1 passed" in result["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_run_tests_verbose(self, server, monkeypatch):
+        """Test run_tests with verbose flag."""
+        expected_cmd = ""
+
+        def mock_subprocess_run(*args, **kwargs):
+            nonlocal expected_cmd
+            expected_cmd = " ".join(args[0])
+
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stdout = "===== verbose output ====="
+                    self.stderr = ""
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+        monkeypatch.setattr("datetime.datetime", MockDateTime)
+
+        run_tests_fn = self.get_tool_fn(server, "run_tests")
+        result = await run_tests_fn(verbose=True)
+
+        assert result["status"] == "success"
+        assert result["returncode"] == 0
+        assert "-v" in expected_cmd
+
+    @pytest.mark.asyncio
+    async def test_run_tests_collect_only(self, server, monkeypatch):
+        """Test run_tests with collect_only flag."""
+        expected_cmd = ""
+
+        def mock_subprocess_run(*args, **kwargs):
+            nonlocal expected_cmd
+            expected_cmd = " ".join(args[0])
+
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stdout = "collected 10 items"
+                    self.stderr = ""
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+        monkeypatch.setattr("datetime.datetime", MockDateTime)
+
+        run_tests_fn = self.get_tool_fn(server, "run_tests")
+        result = await run_tests_fn(collect_only=True)
+
+        assert result["status"] == "success"
+        assert result["returncode"] == 0
+        assert "--collect-only" in expected_cmd
+        assert "collected 10 items" in result["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_run_tests_failure(self, server, monkeypatch):
+        """Test run_tests when tests fail."""
+
+        def mock_subprocess_run(*args, **kwargs):
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 1
+                    self.stdout = "===== 2 failed, 3 passed in 0.05s ====="
+                    self.stderr = "E       AssertionError: expected 5 but got 6"
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+        monkeypatch.setattr("datetime.datetime", MockDateTime)
+
+        run_tests_fn = self.get_tool_fn(server, "run_tests")
+        result = await run_tests_fn()
+
+        assert result["status"] == "failure"
+        assert result["returncode"] == 1
+        assert "2 failed" in result["stdout"]
+        assert "AssertionError" in result["stderr"]
+
+    @pytest.mark.asyncio
+    async def test_run_tests_error(self, server, monkeypatch):
+        """Test run_tests when an exception occurs."""
+
+        def mock_subprocess_run(*args, **kwargs):
+            raise Exception("Command execution failed")
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+
+        run_tests_fn = self.get_tool_fn(server, "run_tests")
+        result = await run_tests_fn()
+
+        assert result["status"] == "error"
+        assert "error" in result
+        assert "Command execution failed" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_run_tests_with_env_python_venv(self, server, monkeypatch):
+        """Test run_tests using Python virtual environment from environment variable."""
+        expected_cmd = ""
+
+        def mock_subprocess_run(*args, **kwargs):
+            nonlocal expected_cmd
+            expected_cmd = " ".join(args[0])
+
+            class MockCompletedProcess:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stdout = "===== All tests passed ====="
+                    self.stderr = ""
+
+            return MockCompletedProcess()
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+        monkeypatch.setattr("datetime.datetime", MockDateTime)
+
+        # Set the python_venv at the server level (environment variable simulation)
+        env_venv_path = "/env/path/to/python"
+        server.python_venv = env_venv_path
+
+        run_tests_fn = self.get_tool_fn(server, "run_tests")
+        result = await run_tests_fn()
+
+        assert result["status"] == "success"
+        assert result["returncode"] == 0
+        assert env_venv_path in expected_cmd
+        assert env_venv_path == expected_cmd.split()[0]  # Should be first in command
+
+
+# Helper class to mock datetime for consistent duration in tests
+class MockDateTime:
+    _now_counter = 0
+
+    @classmethod
+    def now(cls):
+        cls._now_counter += 1
+        return cls.MockDatetimeValue(0 if cls._now_counter % 2 == 1 else 0.5)
+
+    class MockDatetimeValue:
+        def __init__(self, value):
+            self.value = value
+
+        def __sub__(self, other):
+            return MockDateTime.MockTimeDelta(0.5)  # Always return 0.5 seconds
+
+    class MockTimeDelta:
+        def __init__(self, seconds):
+            self.seconds = seconds
+
+        def total_seconds(self):
+            return self.seconds

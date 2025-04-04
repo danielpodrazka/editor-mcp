@@ -239,6 +239,7 @@ class TextEditorServer:
         self.selected_id = None
         self.pending_modified_lines = None
         self.pending_diff = None
+        self.python_venv = os.getenv("PYTHON_VENV")
 
         self.register_tools()
 
@@ -1084,6 +1085,54 @@ class TextEditorServer:
             except Exception as e:
                 return {"error": f"Error finding function: {str(e)}"}
 
+        @self.mcp.tool()
+        async def set_python_path(path: str):
+            """
+            Set it before running tests so the project is correctly recognized
+            """
+            os.environ["PYTHONPATH"] = path
+
+        @self.mcp.tool()
+        async def run_tests(
+            test_path: Optional[str] = None,
+            test_name: Optional[str] = None,
+            verbose: bool = False,
+            collect_only: bool = False,
+        ) -> Dict[str, Any]:
+            """
+            Run pytest tests using the specified Python virtual environment.
+
+            Args:
+                test_path (str, optional): Directory or file path containing tests to run
+                test_name (str, optional): Specific test function/method to run
+                verbose (bool, optional): Run tests in verbose mode
+                collect_only (bool, optional): Only collect tests without executing them
+
+            Returns:
+                dict: Test execution results including returncode, output, and execution time
+            """
+            # Build pytest arguments
+            pytest_args = []
+
+            # Add test path if specified
+            if test_path:
+                pytest_args.append(test_path)
+
+            # Add specific test name if specified
+            if test_name:
+                pytest_args.append(f"-k {test_name}")
+
+            # Add verbosity flag if specified
+            if verbose:
+                pytest_args.append("-v")
+
+            # Add collect-only flag if specified
+            if collect_only:
+                pytest_args.append("--collect-only")
+
+            # Run the tests
+            return self._run_tests(pytest_args)
+
     def _find_js_function(
         self, function_name: str, source_code: str, lines: list
     ) -> Dict[str, Any]:
@@ -1343,6 +1392,60 @@ class TextEditorServer:
         except Exception as e:
             # If anything goes wrong, return None to fall back to regex approach
             return None
+
+    def _run_tests(self, pytest_args=None, python_venv=None):
+        """
+        Run pytest tests using the specified Python virtual environment.
+
+        Args:
+            pytest_args (list, optional): List of arguments to pass to pytest
+            python_venv (str, optional): Path to Python executable in virtual environment
+                                     If not provided, uses PYTHON_VENV environment variable
+
+        Returns:
+            dict: Test execution results including returncode, output, and execution time
+        """
+        try:
+            # Determine the Python executable to use
+            python_venv = (
+                python_venv or self.python_venv
+            )  # Use the class level python_venv
+
+            # If no venv is specified, use the system Python
+            python_cmd = python_venv or "python"
+
+            # Build the command to run pytest
+            cmd = [python_cmd, "-m", "pytest"]
+
+            # Add any additional pytest arguments
+            if pytest_args:
+                cmd.extend(pytest_args)
+
+            # Record the start time
+            start_time = datetime.datetime.now()
+
+            # Run the pytest command
+            process = subprocess.run(cmd, capture_output=True, text=True)
+
+            # Record the end time and calculate duration
+            end_time = datetime.datetime.now()
+            duration = (end_time - start_time).total_seconds()
+
+            # Return the results
+            return {
+                "status": "success" if process.returncode == 0 else "failure",
+                "returncode": process.returncode,
+                "stdout": process.stdout,
+                "stderr": process.stderr,
+                "duration": duration,
+                "command": " ".join(cmd),
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "command": " ".join(cmd) if "cmd" in locals() else None,
+            }
 
     def run(self):
         """Run the MCP server."""
