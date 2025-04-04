@@ -1111,6 +1111,10 @@ class TextEditorServer:
             Returns:
                 dict: Test execution results including returncode, output, and execution time
             """
+            if self.python_venv is None:
+                return {
+                    "error": "No Python environment found. It needs to be set in the MCP config as environment variable called PYTHON_VENV."
+                }
             # Build pytest arguments
             pytest_args = []
 
