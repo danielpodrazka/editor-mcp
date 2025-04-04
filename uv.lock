@@ -20,6 +20,7 @@ click==8.1.8
     #   uvicorn
 coverage==7.7.1
     # via pytest-cov
+duckdb==1.2.1
 fastmcp==0.4.1
 h11==0.14.0
     # via

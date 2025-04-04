@@ -3,3 +3,4 @@ fastmcp
 pytest
 pytest-asyncio
 pytest-cov
+duckdb
