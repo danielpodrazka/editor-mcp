@@ -442,7 +442,7 @@ class TextEditorServer:
         async def read(start: int, end: int) -> Dict[str, Any]:
             """
             Read lines from the current file from start line to end line, returning them in a dictionary
-            like {"lines":[[1,"text on first line"],[2,"text on second line"]]}
+            like {"lines":[[1,"text on first line"],[2,"text on second line"]]}. This makes it easier to find the precise lines to select for editing.
 
             Args:
                 start (int, optional): Start line number
@@ -1111,6 +1111,10 @@ class TextEditorServer:
             Returns:
                 dict: Test execution results including returncode, output, and execution time
             """
+            if self.python_venv is None:
+                return {
+                    "error": "No Python environment found. It needs to be set in the MCP config as environment variable called PYTHON_VENV."
+                }
             # Build pytest arguments
             pytest_args = []
 
