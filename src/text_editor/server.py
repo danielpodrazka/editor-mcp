@@ -15,7 +15,7 @@ import functools
 from typing import Optional, Dict, Any, Union, Literal
 import black
 from black.report import NothingChanged
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 import duckdb
 
 
