@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
 COPY pyproject.toml ./
 
 # Install core dependencies (correct MCP package with CLI tools + additional dependencies)
-RUN pip install --no-cache-dir black "mcp[cli]" duckdb
+RUN pip install --no-cache-dir black fastmcp duckdb
 
 # Install optional dependencies for full functionality
 RUN pip install --no-cache-dir pytest pytest-asyncio pytest-cov
