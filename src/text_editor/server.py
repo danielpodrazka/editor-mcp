@@ -790,10 +790,13 @@ class TextEditorServer:
             """
             Creates a new file.
 
+            After creating new file, the first line is automatically selected for editing.
+            Automatically creates parent directories if they don't exist.
+
             Args:
                 filepath (str): Path of the new file
             Returns:
-                dict: Status message
+                dict: Status message with selection info
 
             """
             self.current_file_path = filepath
@@ -807,15 +810,28 @@ class TextEditorServer:
                 }
 
             try:
+                # Create parent directories if they don't exist
+                directory = os.path.dirname(self.current_file_path)
+                if directory:
+                    os.makedirs(directory, exist_ok=True)
+
                 text = "# NEW_FILE - REMOVE THIS HEADER"
                 with open(self.current_file_path, "w", encoding="utf-8") as file:
                     file.write(text)
+
+                # Automatically select the first line for editing
+                self.selected_start = 1
+                self.selected_end = 1
+                self.selected_id = calculate_id(text, 1, 1)
 
                 result = {
                     "status": "success",
                     "text": text,
                     "current_file_path": self.current_file_path,
-                    "id": calculate_id(text, 1, 1),
+                    "id": self.selected_id,
+                    "selected_start": self.selected_start,
+                    "selected_end": self.selected_end,
+                    "message": "File created successfully. First line is now selected for editing.",
                 }
 
                 return result
