@@ -1479,9 +1479,11 @@ def main():
     when the package is installed via UVX, allowing the
     application to be run using the `editor-mcp` command.
     """
-    server = TextEditorServer()
-    server.run()
+
+    text_editor_server.run()
 
 
+text_editor_server = TextEditorServer()
+mcp = text_editor_server.mcp
 if __name__ == "__main__":
     main()

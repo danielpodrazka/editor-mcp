@@ -19,7 +19,8 @@ classifiers = [
 requires-python = ">=3.11"
 dependencies = [
     "black",
-    "fastmcp",
+    "fastmcp>=2.10.1",
+    "duckdb"
 ]
 
 [project.optional-dependencies]
