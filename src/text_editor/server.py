@@ -1467,9 +1467,9 @@ class TextEditorServer:
                 "command": " ".join(cmd) if "cmd" in locals() else None,
             }
 
-    def run(self):
+    def run(self, transport="stdio", **transport_kwargs):
         """Run the MCP server."""
-        self.mcp.run(transport="stdio")
+        self.mcp.run(transport=transport, **transport_kwargs)
 
 
 def main():
