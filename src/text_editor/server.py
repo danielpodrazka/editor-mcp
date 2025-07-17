@@ -418,7 +418,7 @@ class TextEditorServer:
         @self.mcp.tool()
         async def skim() -> Dict[str, Any]:
             """
-            Read full text from the current file.
+            Read text from the current file, truncated to the first `SKIM_MAX_LINES` lines.
 
             Returns:
                 dict: lines, total_lines, max_select_lines
@@ -429,14 +429,26 @@ class TextEditorServer:
                 lines = file.readlines()
 
                 formatted_lines = []
-                for i, line in enumerate(lines, 1):
+                max_lines_to_show = int(os.getenv("SKIM_MAX_LINES", "500"))
+                lines_to_process = lines[:max_lines_to_show]
+
+                for i, line in enumerate(lines_to_process, 1):
                     formatted_lines.append((i, line.rstrip()))
 
-            return {
+            result = {
                 "lines": formatted_lines,
                 "total_lines": len(lines),
                 "max_select_lines": self.max_select_lines,
             }
+
+            # Add hint if file was truncated
+            if len(lines) > max_lines_to_show:
+                result["truncated"] = True
+                result["hint"] = (
+                    f"File has {len(lines)} total lines. Only showing first {max_lines_to_show} lines. Use `read` to view specific line ranges or `find_line` to search for content in the remaining lines."
+                )
+
+            return result
 
         @self.mcp.tool()
         async def read(start: int, end: int) -> Dict[str, Any]:
