@@ -13,6 +13,7 @@ import json
 import inspect
 import functools
 from typing import Optional, Dict, Any, Union, Literal
+import argparse
 import black
 from black.report import NothingChanged
 from fastmcp import FastMCP
@@ -418,7 +419,7 @@ class TextEditorServer:
         @self.mcp.tool()
         async def skim() -> Dict[str, Any]:
             """
-            Read full text from the current file.
+            Read text from the current file, truncated to the first `SKIM_MAX_LINES` lines.
 
             Returns:
                 dict: lines, total_lines, max_select_lines
@@ -429,14 +430,26 @@ class TextEditorServer:
                 lines = file.readlines()
 
                 formatted_lines = []
-                for i, line in enumerate(lines, 1):
+                max_lines_to_show = int(os.getenv("SKIM_MAX_LINES", "500"))
+                lines_to_process = lines[:max_lines_to_show]
+
+                for i, line in enumerate(lines_to_process, 1):
                     formatted_lines.append((i, line.rstrip()))
 
-            return {
+            result = {
                 "lines": formatted_lines,
                 "total_lines": len(lines),
                 "max_select_lines": self.max_select_lines,
             }
+
+            # Add hint if file was truncated
+            if len(lines) > max_lines_to_show:
+                result["truncated"] = True
+                result["hint"] = (
+                    f"File has {len(lines)} total lines. Only showing first {max_lines_to_show} lines. Use `read` to view specific line ranges or `find_line` to search for content in the remaining lines."
+                )
+
+            return result
 
         @self.mcp.tool()
         async def read(start: int, end: int) -> Dict[str, Any]:
@@ -1467,9 +1480,9 @@ class TextEditorServer:
                 "command": " ".join(cmd) if "cmd" in locals() else None,
             }
 
-    def run(self):
+    def run(self, transport="stdio", **transport_kwargs):
         """Run the MCP server."""
-        self.mcp.run(transport="stdio")
+        self.mcp.run(transport=transport, **transport_kwargs)
 
 
 def main():
@@ -1480,7 +1493,39 @@ def main():
     application to be run using the `editor-mcp` command.
     """
 
-    text_editor_server.run()
+    parser = argparse.ArgumentParser(description="Text Editor MCP Server")
+    parser.add_argument(
+        "--transport",
+        default="stdio",
+        choices=["stdio", "http", "streamable-http"],
+        help="Transport type",
+    )
+    parser.add_argument(
+        "--host", default="127.0.0.1", help="Host to bind to (for HTTP transport)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8001, help="Port to bind to (for HTTP transport)"
+    )
+    parser.add_argument(
+        "--path", default="/mcp", help="Path for HTTP endpoint (for HTTP transport)"
+    )
+
+    args = parser.parse_args()
+
+    host = os.environ.get("FASTMCP_SERVER_HOST", args.host)
+    port = int(os.environ.get("FASTMCP_SERVER_PORT", args.port))
+    path = os.environ.get("FASTMCP_SERVER_PATH", args.path)
+    transport = os.environ.get("FASTMCP_SERVER_TRANSPORT", args.transport)
+
+    # Normalize transport name for FastMCP
+    if transport in ["http", "streamable-http"]:
+        transport = "streamable-http"
+
+    # Run the server with the configured transport
+    if transport == "streamable-http":
+        text_editor_server.run(transport=transport, host=host, port=port, path=path)
+    else:
+        text_editor_server.run(transport=transport)
 
 
 text_editor_server = TextEditorServer()

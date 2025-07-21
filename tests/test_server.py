@@ -10,8 +10,9 @@ from mcp.server.fastmcp import FastMCP
 
 class TestTextEditorServer:
     @pytest.fixture
-    def server(self):
+    def server(self, monkeypatch):
         """Create a TextEditorServer instance for testing."""
+        monkeypatch.setenv("PYTHON_VENV", "python")
         server = TextEditorServer()
         server.max_select_lines = 200
         return server
@@ -1870,7 +1871,6 @@ export default SimpleComponent;
             raise Exception("Command execution failed")
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
-
         run_tests_fn = self.get_tool_fn(server, "run_tests")
         result = await run_tests_fn()
 
