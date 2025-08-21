@@ -2,6 +2,8 @@
 
 A Python-based text editor server built with FastMCP that provides powerful tools for file operations. This server enables reading, editing, and managing text files through a standardized API with a unique multi-step approach that significantly improves code editing accuracy and reliability for LLMs and AI assistants.
 
+[![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/b23694aa-c58a-469d-ba3c-fb54eb4d0d88)
+
 ## Features
 
 - **File Selection**: Set a file to work with using absolute paths
