@@ -312,13 +312,25 @@ Delete the currently set file.
 - Operation result with status and message
 
 #### 9. `new_file`
-Creates a new file.
+Creates a new file and automatically sets it as the current file for subsequent operations.
 
 **Parameters**:
-- `absolute_file_path` (str): Path of the new file
+- `filepath` (str): Path of the new file
 
 **Returns**:
-- Operation result with status and id of the content if applicable
+- Operation result with status, message, and selection info
+- The first line is automatically selected for editing
+
+**Behavior**:
+- Automatically creates parent directories if they don't exist
+- Sets the newly created file as the current working file
+- The first line is pre-selected, ready for immediate editing
+
+**Protected Files Note**:
+- Files matching certain patterns (like `*.env`) can be created normally
+- However, once you move to another file, these protected files cannot be reopened
+- This allows for a "write-once, protect-after" workflow for sensitive configuration files
+- Example: You can create `config.env`, populate it with example config, but cannot reopen it later
 
 **Note**:
 - This tool will fail if the current file exists and is not empty
