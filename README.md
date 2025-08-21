@@ -1,5 +1,3 @@
-[![MSeeP.ai Security Assessment Badge](https://mseep.net/pr/danielpodrazka-editor-mcp-badge.png)](https://mseep.ai/app/danielpodrazka-editor-mcp)
-
 # Editor MCP
 
 A Python-based text editor server built with FastMCP that provides powerful tools for file operations. This server enables reading, editing, and managing text files through a standardized API with a unique multi-step approach that significantly improves code editing accuracy and reliability for LLMs and AI assistants.
